@@ -47,7 +47,40 @@
 
 ### Usage
 
-#### Cross-Platform Scripts (Recommended)
+#### Task (Recommended)
+
+Install [Task](https://taskfile.dev/) and use the modern build system:
+
+```bash
+# Install Task (if not already installed)
+go install github.com/go-task/task/v3/cmd/task@latest
+
+# View available tasks
+task --list
+
+# Quick development workflow
+task build          # build binary
+task lint-interfaces # run unused interface checker
+task lint           # run golangci-lint
+task lint-all       # run all linters
+task test           # run tests
+task dev            # build and run on test files
+task clean          # clean build artifacts
+
+# CI pipeline
+task ci             # full check: download, tidy, build, test, lint
+```
+
+**VSCode Integration** (with keyboard shortcuts):
+- `Ctrl+Shift+L` - All linters
+- `Ctrl+Shift+I` - Unused interfaces only
+- `Ctrl+Shift+G` - Golangci-lint only
+- `Ctrl+Shift+B` - Build
+- `Ctrl+Shift+T` - Tests
+- `Ctrl+Shift+D` - Dev mode
+- `Ctrl+Shift+K` - Full check
+
+#### Cross-Platform Scripts (Alternative)
 
 **Windows (PowerShell):**
 ```powershell
@@ -112,13 +145,30 @@ analyzers := []*analysis.Analyzer{
 
 ### CI/CD Pipeline
 
+**Using Task (Recommended):**
+```yaml
+# GitHub Actions example - Task
+- name: 📦 Install Task
+  run: go install github.com/go-task/task/v3/cmd/task@latest
+
+- name: 🔍 Full pipeline check
+  run: task ci
+
+- name: 🔍 Just unused interfaces
+  run: task lint-interfaces
+```
+
+**Using Makefile (Alternative):**
 ```yaml
 # GitHub Actions example (cross-platform)
 - name: 🔍 Check unused interface methods
   run: |
     make build
     make lint-interfaces
+```
 
+**Manual Commands:**
+```yaml
 # Alternative using direct commands
 - name: 🔍 Check unused interface methods (manual)
   run: |

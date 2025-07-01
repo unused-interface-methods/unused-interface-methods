@@ -1,0 +1,113 @@
+version: "3"
+
+vars:
+  BINARY_NAME:
+    sh: |
+      if [ "{{OS}}" = "windows" ]; then
+        echo "unusedintf.exe"
+      else
+        echo "unusedintf"
+      fi
+  MAIN_PACKAGE: "."
+  TEST_TIMEOUT: "30s"
+
+tasks:
+  default:
+    desc: "Show available tasks"
+    cmds:
+      - task --list
+
+  build:
+    desc: "Build the unusedintf binary"
+    cmds:
+      - go build -o {{.BINARY_NAME}} {{.MAIN_PACKAGE}}
+    sources:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+    generates:
+      - "{{.BINARY_NAME}}"
+
+  test:
+    desc: "Run all tests"
+    cmds:
+      - go test -timeout={{.TEST_TIMEOUT}} ./...
+
+  test-verbose:
+    desc: "Run tests with verbose output"
+    cmds:
+      - go test -v -timeout={{.TEST_TIMEOUT}} ./...
+
+  lint:
+    desc: "Run golangci-lint"
+    cmds:
+      - golangci-lint run
+
+  lint-interfaces:
+    desc: "Run unusedintf linter"
+    deps: [build]
+    cmds:
+      - cmd: \{{.BINARY_NAME}} ./...
+        platforms: [linux, darwin]
+      - cmd: \{{.BINARY_NAME}} ./...
+        platforms: [windows]
+
+  lint-all:
+    desc: "Run all linters"
+    deps: [lint, lint-interfaces]
+
+  clean:
+    desc: "Clean build artifacts"
+    cmds:
+      - cmd: rm -f unusedintf unusedintf.exe
+        platforms: [linux, darwin]
+      - cmd: if exist unusedintf.exe del unusedintf.exe & if exist unusedintf del unusedintf
+        platforms: [windows]
+
+  install:
+    desc: "Install unusedintf globally"
+    cmds:
+      - go install {{.MAIN_PACKAGE}}
+
+  mod-tidy:
+    desc: "Tidy go modules"
+    cmds:
+      - go mod tidy
+
+  mod-download:
+    desc: "Download go modules"
+    cmds:
+      - go mod download
+
+  check:
+    desc: "Run all checks (build, test, lint)"
+    deps: [build, test, lint-all]
+
+  dev:
+    desc: "Development mode - build and run on test files"
+    deps: [build]
+    cmds:
+      - cmd: ./{{.BINARY_NAME}} ./test/...
+        platforms: [linux, darwin]
+      - cmd: .\{{.BINARY_NAME}} ./test/...
+        platforms: [windows]
+
+  ci:
+    desc: "CI pipeline - full check"
+    cmds:
+      - task: mod-download
+      - task: mod-tidy
+      - task: check
+      - task: clean
+
+  watch:
+    desc: "Watch for changes and rebuild"
+    deps: [build]
+    cmds:
+      - cmd: |
+          echo "Watching for changes... Press Ctrl+C to stop"
+          find . -name "*.go" | entr -r task build
+        platforms: [linux, darwin]
+      - cmd: |
+          echo "Use 'task build' manually on Windows or install a file watcher"
+        platforms: [windows]
