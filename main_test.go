@@ -442,13 +442,13 @@ func findSubstring(s, substr string) bool {
 func TestIntegration(t *testing.T) {
 	testdata := analysistest.TestData()
 
-	// Test with skipGenerics = false
+	// Test with skipGenerics = false (all interfaces including generics)
 	skipGenerics = false
 	analysistest.Run(t, testdata, Analyzer, "test")
 
-	// Test with skipGenerics = true
+	// Test with skipGenerics = true (only non-generic interfaces)
 	skipGenerics = true
-	analysistest.Run(t, testdata, Analyzer, "test")
+	analysistest.Run(t, testdata, Analyzer, "test_nodgenerics")
 }
 
 func BenchmarkAnalyzer(b *testing.B) {
@@ -1233,31 +1233,37 @@ func (cs *ComplexStruct) test() {
 	}
 }
 
+// Test specifically for reflection scenarios
+func TestReflectionMethods(t *testing.T) {
+	testdata := analysistest.TestData()
+
+	// Test reflection patterns with generics
+	t.Run("reflection_with_generics", func(t *testing.T) {
+		skipGenerics = false
+		analysistest.Run(t, testdata, Analyzer, "test")
+	})
+
+	// Test reflection patterns without generics
+	t.Run("reflection_without_generics", func(t *testing.T) {
+		skipGenerics = true
+		analysistest.Run(t, testdata, Analyzer, "test_nodgenerics")
+	})
+}
+
 // Test for all test files integration
 func TestAllTestFiles(t *testing.T) {
 	testdata := analysistest.TestData()
 
-	// Test interfaces.go scenarios
-	t.Run("interfaces", func(t *testing.T) {
+	// Test all interfaces with generics enabled (includes reflection)
+	t.Run("all_with_generics", func(t *testing.T) {
 		skipGenerics = false
 		analysistest.Run(t, testdata, Analyzer, "test")
 	})
 
-	// Test generics.go scenarios
-	t.Run("generics_enabled", func(t *testing.T) {
-		skipGenerics = false
-		analysistest.Run(t, testdata, Analyzer, "test")
-	})
-
-	t.Run("generics_disabled", func(t *testing.T) {
+	// Test only non-generic interfaces with generics disabled (includes reflection)
+	t.Run("non_generics_only", func(t *testing.T) {
 		skipGenerics = true
-		analysistest.Run(t, testdata, Analyzer, "test")
-	})
-
-	// Test more_interfaces.go scenarios
-	t.Run("more_interfaces", func(t *testing.T) {
-		skipGenerics = false
-		analysistest.Run(t, testdata, Analyzer, "test")
+		analysistest.Run(t, testdata, Analyzer, "test_nodgenerics")
 	})
 }
 
@@ -1305,6 +1311,14 @@ func TestComprehensiveCoverage(t *testing.T) {
 		"Source/Destination (interface assignments)",
 	}
 
+	// Tested scenarios from test/reflection.go (4 reflection cases):
+	reflectionTests := []string{
+		"ReflectableInterface (MethodByName reflection calls)",
+		"TypeCheckInterface (reflect.TypeOf and type assertions)",
+		"IntrospectableInterface (method introspection)",
+		"GenericReflectable (reflection with generics)",
+	}
+
 	// Tested usage patterns:
 	usagePatterns := []string{
 		"Direct method calls",
@@ -1314,6 +1328,9 @@ func TestComprehensiveCoverage(t *testing.T) {
 		"Goroutine usage",
 		"Defer statements",
 		"Reflection usage (MethodByName)",
+		"Reflection usage (reflect.ValueOf)",
+		"Reflection usage (reflect.TypeOf)",
+		"Complex reflection (method iteration)",
 		"fmt.Println (Stringer interface)",
 		"Interface assignments",
 		"Embedded interfaces",
@@ -1330,8 +1347,9 @@ func TestComprehensiveCoverage(t *testing.T) {
 	t.Logf("✅ Tested %d basic interface categories", len(interfaceTests))
 	t.Logf("✅ Tested %d generic interface patterns", len(genericTests))
 	t.Logf("✅ Tested %d additional complex scenarios", len(moreTests))
+	t.Logf("✅ Tested %d reflection scenarios", len(reflectionTests))
 	t.Logf("✅ Tested %d different usage patterns", len(usagePatterns))
-	t.Logf("✅ Total coverage: %d distinct test scenarios", len(interfaceTests)+len(genericTests)+len(moreTests))
+	t.Logf("✅ Total coverage: %d distinct test scenarios", len(interfaceTests)+len(genericTests)+len(moreTests)+len(reflectionTests))
 
 	// Verify that our tests catch both used and unused methods correctly
 	pass := createTestPass(t, `package test

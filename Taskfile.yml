@@ -47,9 +47,9 @@ tasks:
     desc: "Run unusedintf linter"
     deps: [build]
     cmds:
-      - cmd: \{{.BINARY_NAME}} ./...
+      - cmd: ./{{.BINARY_NAME}} ./...
         platforms: [linux, darwin]
-      - cmd: \{{.BINARY_NAME}} ./...
+      - cmd: "{{.BINARY_NAME}} ./..."
         platforms: [windows]
 
   lint-all:
@@ -61,7 +61,7 @@ tasks:
     cmds:
       - cmd: rm -f unusedintf unusedintf.exe
         platforms: [linux, darwin]
-      - cmd: if exist unusedintf.exe del unusedintf.exe & if exist unusedintf del unusedintf
+      - cmd: cmd /c "del /q unusedintf.exe 2>nul & del /q unusedintf 2>nul"
         platforms: [windows]
 
   install:
@@ -87,9 +87,9 @@ tasks:
     desc: "Development mode - build and run on test files"
     deps: [build]
     cmds:
-      - cmd: ./{{.BINARY_NAME}} ./test/...
+      - cmd: ./{{.BINARY_NAME}} ./testdata/...
         platforms: [linux, darwin]
-      - cmd: .\{{.BINARY_NAME}} ./test/...
+      - cmd: "{{.BINARY_NAME}} ./testdata/..."
         platforms: [windows]
 
   ci:
