@@ -1,6 +1,17 @@
 {
-  "go.lintTool": "golangci-lint",
-  "go.lintFlags": ["--fast"],
+  "go.lintTool": "staticcheck",
+  "go.lintFlags": [],
   "go.toolsEnvVars": {},
-  "go.lintOnSave": "package"
+  "go.lintOnSave": "workspace",
+  "go.buildOnSave": "off",
+  "go.alternateTools": {
+    "golangci-lint": "golangci-lint"
+  },
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.profiles.windows": {
+    "PowerShell": {
+      "source": "PowerShell",
+      "icon": "terminal-powershell"
+    }
+  }
 }

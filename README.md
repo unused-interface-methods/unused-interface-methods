@@ -85,6 +85,58 @@ task ci              # full CI pipeline
 - `Ctrl+Shift+D` - Dev mode
 - `Ctrl+Shift+K` - Full check
 
+## 🔧 VS Code Integration
+
+This linter integrates seamlessly with **"Go: Lint Workspace"** functionality:
+
+### Method 1: Integrated Wrapper (Recommended)
+
+Use the provided wrapper scripts for automatic execution:
+
+```bash
+# Windows
+./lint-wrapper.ps1                    # run both linters
+./lint-wrapper.ps1 -InterfacesOnly    # run only unusedintf
+./lint-wrapper.ps1 -StandardOnly      # run only golangci-lint
+
+# Linux/Mac  
+./lint-wrapper.sh                     # run both linters
+./lint-wrapper.sh --interfaces-only   # run only unusedintf
+./lint-wrapper.sh --standard-only     # run only golangci-lint
+```
+
+**VS Code Integration:**
+1. `Ctrl+Shift+P` → `Tasks: Run Task` → `Go: Lint Workspace (Integrated)`
+2. Or run directly: `task lint-wrapper`
+
+### Method 2: Manual VS Code Tasks
+
+Available VS Code tasks (Command Palette):
+- `Go: Lint Interfaces` - Run only interface linter  
+- `Go: Lint Standard` - Run only golangci-lint
+- `Go: Lint All` - Run both linters sequentially
+- `Go: Lint Workspace (Integrated)` - Cross-platform wrapper
+
+### Method 3: Editor Configuration  
+
+Configure in `.vscode/settings.json`:
+
+```json
+{
+    "go.lintTool": "staticcheck",
+    "go.lintOnSave": "workspace"
+}
+```
+
+### ✨ Features
+
+The VS Code integration provides:
+- ✅ **Real-time highlighting** of unused interface methods
+- ✅ **Problems panel** integration with clickable errors
+- ✅ **File explorer markers** showing files with issues
+- ✅ **Cross-platform compatibility** (Windows/Linux/Mac)
+- ✅ **Automatic problem matching** for both linters
+
 ### Option 2: Makefile (Universal)
 
 ```bash

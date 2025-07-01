@@ -111,3 +111,11 @@ tasks:
       - cmd: |
           echo "Use 'task build' manually on Windows or install a file watcher"
         platforms: [windows]
+
+  lint-wrapper:
+    desc: "run integrated linter wrapper for VS Code"
+    cmds:
+      - cmd: powershell.exe -ExecutionPolicy Bypass -File lint-wrapper.ps1
+        platforms: [windows]
+      - cmd: ./lint-wrapper.sh
+        platforms: [linux, darwin]
