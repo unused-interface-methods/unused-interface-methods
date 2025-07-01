@@ -7,8 +7,8 @@ import (
 	"sort"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/multichecker"
 	"golang.org/x/tools/go/analysis/passes/inspect"
+	"golang.org/x/tools/go/analysis/singlechecker"
 	"golang.org/x/tools/go/ast/inspector"
 )
 
@@ -223,5 +223,5 @@ func run(pass *analysis.Pass) (interface{}, error) {
 }
 
 func main() {
-	multichecker.Main(Analyzer)
+	singlechecker.Main(Analyzer)
 }
