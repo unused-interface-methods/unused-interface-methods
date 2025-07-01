@@ -29,49 +29,54 @@
 - 📊 **Clean Output**: Sorted by file path and line numbers
 - ⚙️ **Configurable**: Optional `-skipGenerics` flag for legacy codebases
 - 🔌 **Editor Integration**: Works with `go vet`, `gopls`, and your favorite IDE
+- 🌍 **Cross-Platform**: Full support for Windows, Linux, and macOS
 
 ## 🚀 Quick Start
 
 ### Installation
 
-1. **Install golangci-lint:**
-   ```bash
-   go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-   ```
-
-2. **Build the linter:**
-   ```bash
-   # Cross-platform build using Makefile
-   make build
-   ```
-
-### Usage
-
-#### Task (Recommended)
-
-Install [Task](https://taskfile.dev/) and use the modern build system:
-
 ```bash
-# Install Task (if not already installed)
-go install github.com/go-task/task/v3/cmd/task@latest
+# Install golangci-lint
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
-# View available tasks
-task --list
-
-# Quick development workflow
-task build          # build binary
-task lint-interfaces # run unused interface checker
-task lint           # run golangci-lint
-task lint-all       # run all linters
-task test           # run tests
-task dev            # build and run on test files
-task clean          # clean build artifacts
-
-# CI pipeline
-task ci             # full check: download, tidy, build, test, lint
+# Clone and build
+git clone https://github.com/Headcrab/lint.git
+cd lint
+make build
 ```
 
-**VSCode Integration** (with keyboard shortcuts):
+## 🔧 Binary Names
+
+The build system automatically detects your platform:
+
+- **Windows**: `unusedintf.exe`
+- **Linux/macOS/Unix**: `unusedintf`
+
+## 🎮 Usage Options
+
+### Option 1: Task (Recommended)
+
+Install [Task](https://taskfile.dev/) for the modern build system:
+
+```bash
+# Install Task
+go install github.com/go-task/task/v3/cmd/task@latest
+
+# Available tasks
+task --list
+
+# Development workflow
+task build           # build binary
+task lint-interfaces # run unused interface checker
+task lint            # run golangci-lint
+task lint-all        # run all linters
+task test            # run tests
+task dev             # build and run on test files
+task clean           # clean build artifacts
+task ci              # full CI pipeline
+```
+
+**VSCode Integration** (keyboard shortcuts):
 - `Ctrl+Shift+L` - All linters
 - `Ctrl+Shift+I` - Unused interfaces only
 - `Ctrl+Shift+G` - Golangci-lint only
@@ -80,44 +85,35 @@ task ci             # full check: download, tidy, build, test, lint
 - `Ctrl+Shift+D` - Dev mode
 - `Ctrl+Shift+K` - Full check
 
-#### Cross-Platform Scripts (Alternative)
+### Option 2: Makefile (Universal)
 
-**Windows (PowerShell):**
-```powershell
-# Run both linters
-./lint.ps1
-
-# Run specific linter
-./lint.ps1 standard     # golangci-lint only
-./lint.ps1 interfaces   # unused interface methods only
-./lint.ps1 test         # run tests
-./lint.ps1 help         # show help
+```bash
+make build           # build cross-platform binary
+make lint            # run both linters
+make lint-interfaces # run unused interface methods linter
+make test            # run tests  
+make clean           # remove build artifacts
+make help            # show available targets
 ```
 
-**Unix/Linux/macOS (Shell):**
-```bash
-# Run both linters
-./lint.sh
+### Option 3: Manual Commands
 
-# Run specific linter
-./lint.sh standard     # golangci-lint only
-./lint.sh interfaces   # unused interface methods only
-./lint.sh test         # run tests
-./lint.sh help         # show help
+**Build:**
+```bash
+# Windows
+go build -o unusedintf.exe .
+
+# Linux/macOS
+go build -o unusedintf .
 ```
 
-#### Manual (Cross-Platform)
+**Run:**
 ```bash
-# Build first
-make build
+# Windows  
+./unusedintf.exe ./...
 
-# Standard linting
-golangci-lint run .
-
-# Unused interface methods (binary name varies by OS)
-# On Windows: ./unusedintf.exe ./...
-# On Unix/Linux/macOS: ./unusedintf ./...
-make lint-interfaces
+# Linux/macOS
+./unusedintf ./...
 ```
 
 ## 📋 Sample Output
@@ -145,40 +141,85 @@ analyzers := []*analysis.Analyzer{
 
 ### CI/CD Pipeline
 
+#### GitHub Actions
+
 **Using Task (Recommended):**
 ```yaml
-# GitHub Actions example - Task
-- name: 📦 Install Task
-  run: go install github.com/go-task/task/v3/cmd/task@latest
+name: Cross-Platform Lint
 
-- name: 🔍 Full pipeline check
-  run: task ci
+on: [push, pull_request]
 
-- name: 🔍 Just unused interfaces
-  run: task lint-interfaces
+jobs:
+  lint:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+        
+    - name: Install Task
+      run: go install github.com/go-task/task/v3/cmd/task@latest
+      
+    - name: Full CI pipeline
+      run: task ci
 ```
 
-**Using Makefile (Alternative):**
+**Using Makefile:**
 ```yaml
-# GitHub Actions example (cross-platform)
-- name: 🔍 Check unused interface methods
-  run: |
-    make build
-    make lint-interfaces
+name: Cross-Platform Lint
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+        
+    - name: Install golangci-lint
+      run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      
+    - name: Run build and lint
+      run: |
+        make build
+        make lint
 ```
 
-**Manual Commands:**
+#### GitLab CI
+
 ```yaml
-# Alternative using direct commands
-- name: 🔍 Check unused interface methods (manual)
-  run: |
-    if [[ "$RUNNER_OS" == "Windows" ]]; then
-      go build -o unusedintf.exe .
-      ./unusedintf.exe ./...
-    else
-      go build -o unusedintf .
-      ./unusedintf ./...
-    fi
+stages:
+  - lint
+
+variables:
+  GO_VERSION: "1.24"
+
+.lint_template: &lint_template
+  image: golang:${GO_VERSION}
+  before_script:
+    - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+    - go install github.com/go-task/task/v3/cmd/task@latest
+  script:
+    - task ci
+
+lint:
+  <<: *lint_template
 ```
 
 ## ⚠️ Known Limitations
@@ -199,14 +240,18 @@ We ❤️ contributions! Please include:
 ### Development
 
 ```bash
-# 🧪 Run tests
-go test ./...
+# Run tests
+task test
+# or
+make test
 
-# 🔍 Lint the linter
-go vet ./...
+# Run linting
+task lint-all
+# or  
+make lint
 
-# 🚀 Test on real projects
-./unusedintf ./...
+# Test on real projects
+task dev
 ```
 
 ## 📊 Stats
