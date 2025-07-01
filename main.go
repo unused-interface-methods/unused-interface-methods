@@ -112,13 +112,12 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					continue
 				}
 
-				if ifaceMethod == calledMethod {
+				if calledMethod == ifaceMethod {
 					usedMethods[ifaceMethod] = true
 					continue
 				}
 
-				if calledMethod.Name() != ifaceMethod.Name() ||
-					calledMethod.Type().(*types.Signature).String() != ifaceMethod.Type().(*types.Signature).String() {
+				if calledMethod.Name() != ifaceMethod.Name() {
 					continue
 				}
 
@@ -136,10 +135,22 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					continue
 				}
 
-				// --- Generic fallback: match by name and signature for instantiated generic interfaces ---
-				if calledMethod.Name() == ifaceMethod.Name() &&
-					calledMethod.Type().(*types.Signature).String() == ifaceMethod.Type().(*types.Signature).String() {
-					usedMethods[ifaceMethod] = true
+				// --- Новая логика для дженериков: проверяем имя и количество параметров/результатов,
+				// а также, что тип получателя является инстанциацией исходного интерфейса.
+				if calledMethod.Name() == ifaceMethod.Name() {
+					cmSig := calledMethod.Type().(*types.Signature)
+					imSig := ifaceMethod.Type().(*types.Signature)
+					if cmSig.Params().Len() == imSig.Params().Len() && cmSig.Results().Len() == imSig.Results().Len() {
+						// Пытаемся определить, является ли recv инстанциацией info.iface (для generic интерфейсов)
+						if namedRecv, ok := recv.(*types.Named); ok {
+							if origin := namedRecv.Origin(); origin != nil {
+								ifaceOrig, ok2 := origin.Underlying().(*types.Interface)
+								if ok2 && types.Identical(ifaceOrig, info.iface) {
+									usedMethods[ifaceMethod] = true
+								}
+							}
+						}
+					}
 				}
 			}
 
