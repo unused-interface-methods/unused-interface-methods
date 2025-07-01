@@ -87,10 +87,31 @@ func collectInterfaceMethods(pass *analysis.Pass) map[*types.Func]methodInfo {
 	return ifaceMethods
 }
 
-// analyzeUsedMethods traverses AST and marks used methods.
+// methodAnalyzer handles analysis of method usage in AST
+type methodAnalyzer struct {
+	pass         *analysis.Pass
+	ifaceMethods map[*types.Func]methodInfo
+	usedMethods  map[*types.Func]bool
+}
+
+// newMethodAnalyzer creates a new method analyzer
+func newMethodAnalyzer(pass *analysis.Pass, ifaceMethods map[*types.Func]methodInfo) *methodAnalyzer {
+	return &methodAnalyzer{
+		pass:         pass,
+		ifaceMethods: ifaceMethods,
+		usedMethods:  make(map[*types.Func]bool),
+	}
+}
+
+// analyzeUsedMethods traverses AST and marks used methods
 func analyzeUsedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]methodInfo) map[*types.Func]bool {
-	ins := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	usedMethods := make(map[*types.Func]bool)
+	analyzer := newMethodAnalyzer(pass, ifaceMethods)
+	return analyzer.analyze()
+}
+
+// analyze performs the main analysis logic
+func (ma *methodAnalyzer) analyze() map[*types.Func]bool {
+	ins := ma.pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 
 	nodeFilter := []ast.Node{
 		(*ast.SelectorExpr)(nil),
@@ -100,95 +121,161 @@ func analyzeUsedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]method
 	ins.Preorder(nodeFilter, func(n ast.Node) {
 		switch node := n.(type) {
 		case *ast.SelectorExpr:
-			sel := pass.TypesInfo.Selections[node]
-			if sel == nil || (sel.Kind() != types.MethodVal && sel.Kind() != types.MethodExpr) {
-				return
-			}
-
-			calledMethod := sel.Obj().(*types.Func)
-			recv := sel.Recv()
-
-			for ifaceMethod, info := range ifaceMethods {
-				if usedMethods[ifaceMethod] {
-					continue
-				}
-
-				if calledMethod == ifaceMethod {
-					usedMethods[ifaceMethod] = true
-					continue
-				}
-
-				if calledMethod.Name() != ifaceMethod.Name() {
-					continue
-				}
-
-				implemented := types.Implements(recv, info.iface)
-				if !implemented {
-					if recvIface, ok := recv.Underlying().(*types.Interface); ok {
-						if types.Implements(info.iface, recvIface) {
-							implemented = true
-						}
-					}
-				}
-
-				if implemented {
-					usedMethods[ifaceMethod] = true
-					continue
-				}
-
-				// Generic heuristic: имя совпало, сигнатуры совместимы, а получатель является инстанциацией iface
-				if namedRecv, ok := recv.(*types.Named); ok {
-					if origin := namedRecv.Origin(); origin != nil {
-						if ifaceOrig, ok2 := origin.Underlying().(*types.Interface); ok2 && types.Identical(ifaceOrig, info.iface) {
-							usedMethods[ifaceMethod] = true
-						}
-					}
-				}
-			}
-
+			ma.analyzeSelectorExpr(node)
 		case *ast.CallExpr:
-			var ident *ast.Ident
-			switch fun := node.Fun.(type) {
-			case *ast.Ident:
-				ident = fun
-			case *ast.SelectorExpr:
-				ident = fun.Sel
-			default:
-				return
-			}
-
-			fn, ok := pass.TypesInfo.Uses[ident].(*types.Func)
-			if !ok || fn.Pkg() == nil || fn.Pkg().Path() != "fmt" {
-				return
-			}
-
-			for _, arg := range node.Args {
-				argType := pass.TypesInfo.TypeOf(arg)
-				if argType == nil {
-					continue
-				}
-
-				for ifaceMethod, info := range ifaceMethods {
-					if usedMethods[ifaceMethod] {
-						continue
-					}
-					sig, ok := ifaceMethod.Type().(*types.Signature)
-					if !ok || ifaceMethod.Name() != "String" || sig.Params().Len() != 0 || sig.Results().Len() != 1 {
-						continue
-					}
-					if basic, ok := sig.Results().At(0).Type().(*types.Basic); !ok || basic.Kind() != types.String {
-						continue
-					}
-
-					if types.Implements(argType, info.iface) {
-						usedMethods[ifaceMethod] = true
-					}
-				}
-			}
+			ma.analyzeCallExpr(node)
 		}
 	})
 
-	return usedMethods
+	return ma.usedMethods
+}
+
+// analyzeSelectorExpr handles method calls through selectors
+func (ma *methodAnalyzer) analyzeSelectorExpr(node *ast.SelectorExpr) {
+	sel := ma.pass.TypesInfo.Selections[node]
+	if sel == nil || (sel.Kind() != types.MethodVal && sel.Kind() != types.MethodExpr) {
+		return
+	}
+
+	calledMethod := sel.Obj().(*types.Func)
+	recv := sel.Recv()
+
+	ma.markMatchingMethods(calledMethod, recv)
+}
+
+// markMatchingMethods marks interface methods that match the called method
+func (ma *methodAnalyzer) markMatchingMethods(calledMethod *types.Func, recv types.Type) {
+	for ifaceMethod, info := range ma.ifaceMethods {
+		if ma.usedMethods[ifaceMethod] {
+			continue
+		}
+
+		if ma.isMethodMatch(calledMethod, ifaceMethod, recv, info) {
+			ma.usedMethods[ifaceMethod] = true
+		}
+	}
+}
+
+// isMethodMatch checks if called method matches interface method
+func (ma *methodAnalyzer) isMethodMatch(calledMethod, ifaceMethod *types.Func, recv types.Type, info methodInfo) bool {
+	// direct match
+	if calledMethod == ifaceMethod {
+		return true
+	}
+
+	// name mismatch
+	if calledMethod.Name() != ifaceMethod.Name() {
+		return false
+	}
+
+	// check if receiver implements interface
+	return ma.checkImplements(recv, info)
+}
+
+// checkImplements checks if receiver type implements the interface
+func (ma *methodAnalyzer) checkImplements(recv types.Type, info methodInfo) bool {
+	// direct implementation
+	if types.Implements(recv, info.iface) {
+		return true
+	}
+
+	// interface-to-interface check
+	if recvIface, ok := recv.Underlying().(*types.Interface); ok {
+		if types.Implements(info.iface, recvIface) {
+			return true
+		}
+	}
+
+	// generic type check
+	return ma.checkGenericImplements(recv, info)
+}
+
+// checkGenericImplements handles generic type implementations
+func (ma *methodAnalyzer) checkGenericImplements(recv types.Type, info methodInfo) bool {
+	namedRecv, ok := recv.(*types.Named)
+	if !ok {
+		return false
+	}
+
+	origin := namedRecv.Origin()
+	if origin == nil {
+		return false
+	}
+
+	ifaceOrig, ok := origin.Underlying().(*types.Interface)
+	return ok && types.Identical(ifaceOrig, info.iface)
+}
+
+// analyzeCallExpr handles function calls (specifically fmt.* functions)
+func (ma *methodAnalyzer) analyzeCallExpr(node *ast.CallExpr) {
+	ident := ma.extractFunctionIdent(node)
+	if ident == nil {
+		return
+	}
+
+	if !ma.isFmtFunction(ident) {
+		return
+	}
+
+	ma.analyzeFmtCall(node)
+}
+
+// extractFunctionIdent extracts function identifier from call expression
+func (ma *methodAnalyzer) extractFunctionIdent(node *ast.CallExpr) *ast.Ident {
+	switch fun := node.Fun.(type) {
+	case *ast.Ident:
+		return fun
+	case *ast.SelectorExpr:
+		return fun.Sel
+	default:
+		return nil
+	}
+}
+
+// isFmtFunction checks if the function belongs to fmt package
+func (ma *methodAnalyzer) isFmtFunction(ident *ast.Ident) bool {
+	fn, ok := ma.pass.TypesInfo.Uses[ident].(*types.Func)
+	return ok && fn.Pkg() != nil && fn.Pkg().Path() == "fmt"
+}
+
+// analyzeFmtCall analyzes fmt function calls for Stringer interface usage
+func (ma *methodAnalyzer) analyzeFmtCall(node *ast.CallExpr) {
+	for _, arg := range node.Args {
+		argType := ma.pass.TypesInfo.TypeOf(arg)
+		if argType == nil {
+			continue
+		}
+
+		ma.checkStringerUsage(argType)
+	}
+}
+
+// checkStringerUsage checks if argument implements Stringer interface
+func (ma *methodAnalyzer) checkStringerUsage(argType types.Type) {
+	for ifaceMethod, info := range ma.ifaceMethods {
+		if ma.usedMethods[ifaceMethod] {
+			continue
+		}
+
+		if ma.isStringerMethod(ifaceMethod) && types.Implements(argType, info.iface) {
+			ma.usedMethods[ifaceMethod] = true
+		}
+	}
+}
+
+// isStringerMethod checks if method is String() string
+func (ma *methodAnalyzer) isStringerMethod(method *types.Func) bool {
+	if method.Name() != "String" {
+		return false
+	}
+
+	sig, ok := method.Type().(*types.Signature)
+	if !ok || sig.Params().Len() != 0 || sig.Results().Len() != 1 {
+		return false
+	}
+
+	basic, ok := sig.Results().At(0).Type().(*types.Basic)
+	return ok && basic.Kind() == types.String
 }
 
 // reportUnusedMethods sorts and reports methods that were not used.
