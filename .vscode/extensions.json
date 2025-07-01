@@ -1,0 +1,7 @@
+{
+  "recommendations": [
+    "golang.go",
+    "ms-vscode.vscode-tasks",
+    "ms-vscode.vscode-json"
+  ]
+}

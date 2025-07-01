@@ -34,25 +34,37 @@
 
 ### Installation
 
-```powershell
-# 📥 Clone and build
-git clone https://github.com/Headcrab/lint.git
-cd lint
-go build -o unusedintf.exe .
-```
+1. **Install golangci-lint:**
+   ```bash
+   go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+   ```
+
+2. **Build the linter:**
+   ```bash
+   go build -o unusedintf.exe .
+   ```
 
 ### Usage
 
-```powershell
-# 🔍 Analyze your entire module
-.\unusedintf.exe ./...
+#### PowerShell Script (Recommended)
+```bash
+# Run both linters
+./lint.ps1
 
-# 🎛️ Skip generic interfaces
-.\unusedintf.exe -skipGenerics ./...
+# Run specific linter
+./lint.ps1 standard     # golangci-lint only
+./lint.ps1 interfaces   # unused interface methods only
+./lint.ps1 test         # run tests
+./lint.ps1 help         # show help
+```
 
-# 📄 Save detailed report
-$OutputEncoding = [System.Text.Encoding]::UTF8
-.\unusedintf.exe ./... *> report.txt
+#### Manual
+```bash
+# Standard linting
+golangci-lint run .
+
+# Unused interface methods
+./unusedintf.exe ./...
 ```
 
 ## 📋 Sample Output
@@ -134,4 +146,8 @@ MIT © [Headcrab](https://github.com/Headcrab/lint) - see [LICENSE](LICENSE) for
 
 Made with ❤️ for the Go community
 
-</div> 
+</div>
+
+## Options
+
+- `-skipGenerics` - Skip generic interface analysis 
