@@ -1,80 +1,137 @@
-# unusedint – Go analyzer for unused interface methods
+# 🔍 unusedintf – Go Unused Interface Methods Analyzer
 
-## Overview
-`unusedint` is a static analysis plugin for Go that detects interface methods that
-are **declared but never used** anywhere in the code-base. It integrates with
-[golang.org/x/tools/go/analysis](https://pkg.go.dev/golang.org/x/tools/go/analysis)
-and can be executed either as a standalone binary (via `multichecker`) or inside
-your favourite editor supporting `go vet`/`gopls` analyzers.
+[![Go Version](https://img.shields.io/github/go-mod/go-version/Headcrab/lint)](https://golang.org/dl/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Headcrab/lint)](https://goreportcard.com/report/github.com/Headcrab/lint)
+[![CI](https://github.com/Headcrab/lint/workflows/CI/badge.svg)](https://github.com/Headcrab/lint/actions)
 
-Why you may want it:
-* Interfaces are part of public API – dead methods confuse users and inflate
-  maintenance cost.
-* Removing unused surface makes refactoring easier and compilation faster.
-* CI‐friendly: non-zero exit status when issues are found.
+> 🚀 **Lightning-fast static analyzer** that hunts down unused interface methods in your Go codebase
 
-## Features
-* Detects unused methods on ordinary and **generic** interfaces (Go 1.18+).
-* Understands implicit usages via:
-  * Method values / function pointers.
-  * Type assertions / type switches.
-  * Embedded interfaces (both directions).
-  *  `fmt` package implicit `String()` calls.
-* Grouped, stable output: file-path → ascending line numbers.
-* Opt-in flag `-skipGenerics` – skip generic interfaces if you only care about
-  the pre-1.18 world.
+## 🎯 Overview
 
-## Installation
+`unusedintf` is a **powerful static analysis tool** for Go that detects interface methods that are **declared but never used** anywhere in your codebase. Built on top of [golang.org/x/tools/go/analysis](https://pkg.go.dev/golang.org/x/tools/go/analysis), it seamlessly integrates with your development workflow.
+
+### 💡 Why You Need This
+
+- 🧹 **Clean APIs**: Dead interface methods confuse users and bloat your public API
+- ⚡ **Faster Builds**: Removing unused code makes compilation faster
+- 🔧 **Easier Refactoring**: Less surface area = simpler maintenance
+- 🚦 **CI-Ready**: Non-zero exit status when issues are found
+
+## ✨ Features
+
+- 🎯 **Smart Detection**: Finds unused methods on ordinary and **generic** interfaces (Go 1.18+)
+- 🧠 **Context-Aware**: Understands complex usage patterns:
+  - 📎 Method values & function pointers
+  - 🔄 Type assertions & type switches  
+  - 📦 Embedded interfaces (bidirectional)
+  - 🖨️ `fmt` package implicit `String()` calls
+- 📊 **Clean Output**: Sorted by file path and line numbers
+- ⚙️ **Configurable**: Optional `-skipGenerics` flag for legacy codebases
+- 🔌 **Editor Integration**: Works with `go vet`, `gopls`, and your favorite IDE
+
+## 🚀 Quick Start
+
+### Installation
+
 ```powershell
-# Windows PowerShell, adjust paths for *nix
-cd path\to\your\repo
-# build in repo root (produces lnt.exe)
-go build -o lnt.exe .
-```
-Bundling into your own multichecker is also possible – just add
-`unusedint.Analyzer` to the list.
-
-## Usage
-### Analyse current module
-```powershell
-./lnt.exe ./...
-```
-
-### Skip generic interfaces
-```powershell
-./lnt.exe -skipGenerics ./...
+# 📥 Clone and build
+git clone https://github.com/Headcrab/lint.git
+cd lint
+go build -o unusedintf.exe .
 ```
 
-### Redirect full report to UTF-8 file
+### Usage
+
 ```powershell
+# 🔍 Analyze your entire module
+.\unusedintf.exe ./...
+
+# 🎛️ Skip generic interfaces
+.\unusedintf.exe -skipGenerics ./...
+
+# 📄 Save detailed report
 $OutputEncoding = [System.Text.Encoding]::UTF8
-./lnt.exe ./... *> report.txt
+.\unusedintf.exe ./... *> report.txt
 ```
 
-The tool exits with **status 1** if at least one unused method is found – makes
-it easy to hook into CI.
+## 📋 Sample Output
 
-## Output example
 ```
-/absolute/path/project/pkg/service/user.go:42:2: метод "Handle" интерфейса "UserProcessor" объявлен, но не используется
+D:\work\go\lint\test\interfaces.go:38:2: method "OnError" of interface "EventHandler" is declared but not used
+D:\work\go\lint\test\interfaces.go:39:2: method "Subscribe" of interface "EventHandler" is declared but not used
 ```
 
-Format: `file:line:column: message` – identical to `go vet`, so editors parse it
-out of the box.
+> 💡 **Pro Tip**: Output format is identical to `go vet` - your editor will highlight issues automatically!
 
-## Known limitations
-* Does not track reflection (`reflect.Value.Call`), code generation or dynamic
-  plugin loading – impossible statically.
-* Generic support uses best-effort signature matching; exotic corner-cases may
-  slip through.
+## 🔧 Integration
 
-## Contributing
-Pull requests and issue reports are welcome! Please include:
-1. Reproducer (code snippet or repo).
-2. Expected vs actual output.
-3. Go version (`go version`).
+### With your own analyzer
 
-Run `go test ./...` and `go vet ./...` before submitting.
+```go
+import "github.com/Headcrab/lint"
 
-## License
-MIT – see [LICENSE](LICENSE). 
+// Add to your multichecker
+analyzers := []*analysis.Analyzer{
+    unusedintf.Analyzer,
+    // ... your other analyzers
+}
+```
+
+### CI/CD Pipeline
+
+```yaml
+# GitHub Actions example
+- name: 🔍 Check unused interface methods
+  run: |
+    go build -o unusedintf ./cmd/unusedintf
+    ./unusedintf ./...
+```
+
+## ⚠️ Known Limitations
+
+- 🪞 **Reflection**: Cannot track `reflect.Value.Call()` usage
+- 🤖 **Code Generation**: Dynamic/generated code is not analyzed
+- 🔌 **Plugins**: Runtime plugin loading is not tracked
+- 🧪 **Generics**: Best-effort matching; edge cases may slip through
+
+## 🤝 Contributing
+
+We ❤️ contributions! Please include:
+
+1. 🐛 **Reproducer** (code snippet or minimal repo)
+2. 📊 **Expected vs actual output**
+3. 🔖 **Go version** (`go version`)
+
+### Development
+
+```bash
+# 🧪 Run tests
+go test ./...
+
+# 🔍 Lint the linter
+go vet ./...
+
+# 🚀 Test on real projects
+./unusedintf ./...
+```
+
+## 📊 Stats
+
+![GitHub stars](https://img.shields.io/github/stars/Headcrab/lint?style=social)
+![GitHub forks](https://img.shields.io/github/forks/Headcrab/lint?style=social)
+![GitHub watchers](https://img.shields.io/github/watchers/Headcrab/lint?style=social)
+
+## 📄 License
+
+MIT © [Headcrab](https://github.com/Headcrab/lint) - see [LICENSE](LICENSE) for details.
+
+---
+
+<div align="center">
+
+**[⭐ Star this repo](https://github.com/Headcrab/lint)** if it helped you write cleaner Go code!
+
+Made with ❤️ for the Go community
+
+</div> 

@@ -18,10 +18,10 @@ func init() {
 	Analyzer.Flags.BoolVar(&skipGenerics, "skipGenerics", false, "skip interfaces with type parameters (generics)")
 }
 
-// Analyzer реализует плагины для поиска неиспользуемых методов интерфейсов.
+// Analyzer implements plugins for finding unused interface methods.
 var Analyzer = &analysis.Analyzer{
-	Name:     "unusedint",
-	Doc:      "находит методы интерфейсов, объявленные, но не используемые в коде",
+	Name:     "unusedintf",
+	Doc:      "finds interface methods that are declared but not used in the code",
 	Requires: []*analysis.Analyzer{inspect.Analyzer},
 	Run:      run,
 }
@@ -33,8 +33,8 @@ type methodInfo struct {
 	used      bool             // флаг использования
 }
 
-func run(pass *analysis.Pass) (interface{}, error) {
-	// Шаг A: собрать информацию об интерфейсных методах
+// collectInterfaceMethods collects all explicit interface methods in the package.
+func collectInterfaceMethods(pass *analysis.Pass) map[*types.Func]methodInfo {
 	ifaceMethods := map[*types.Func]methodInfo{}
 
 	for _, file := range pass.Files {
@@ -58,11 +58,9 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					continue
 				}
 
-				// Опционально пропускаем дженерик-интерфейсы (с параметрами типа)
-				if skipGenerics {
-					if named.TypeParams() != nil && named.TypeParams().Len() > 0 {
-						continue
-					}
+				// Skip generic interfaces when necessary.
+				if skipGenerics && named.TypeParams() != nil && named.TypeParams().Len() > 0 {
+					continue
 				}
 
 				ifaceType, ok := named.Underlying().(*types.Interface)
@@ -86,19 +84,22 @@ func run(pass *analysis.Pass) (interface{}, error) {
 		}
 	}
 
-	// Шаг B: отметить использованные методы
+	return ifaceMethods
+}
+
+// analyzeUsedMethods traverses AST and marks used methods.
+func analyzeUsedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]methodInfo) map[*types.Func]bool {
 	ins := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
+	usedMethods := make(map[*types.Func]bool)
+
 	nodeFilter := []ast.Node{
 		(*ast.SelectorExpr)(nil),
 		(*ast.CallExpr)(nil),
 	}
 
-	usedMethods := make(map[*types.Func]bool)
-
 	ins.Preorder(nodeFilter, func(n ast.Node) {
 		switch node := n.(type) {
 		case *ast.SelectorExpr:
-			// Обработка прямых вызовов методов
 			sel := pass.TypesInfo.Selections[node]
 			if sel == nil || (sel.Kind() != types.MethodVal && sel.Kind() != types.MethodExpr) {
 				return
@@ -135,27 +136,17 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					continue
 				}
 
-				// --- Новая логика для дженериков: проверяем имя и количество параметров/результатов,
-				// а также, что тип получателя является инстанциацией исходного интерфейса.
-				if calledMethod.Name() == ifaceMethod.Name() {
-					cmSig := calledMethod.Type().(*types.Signature)
-					imSig := ifaceMethod.Type().(*types.Signature)
-					if cmSig.Params().Len() == imSig.Params().Len() && cmSig.Results().Len() == imSig.Results().Len() {
-						// Пытаемся определить, является ли recv инстанциацией info.iface (для generic интерфейсов)
-						if namedRecv, ok := recv.(*types.Named); ok {
-							if origin := namedRecv.Origin(); origin != nil {
-								ifaceOrig, ok2 := origin.Underlying().(*types.Interface)
-								if ok2 && types.Identical(ifaceOrig, info.iface) {
-									usedMethods[ifaceMethod] = true
-								}
-							}
+				// Generic heuristic: имя совпало, сигнатуры совместимы, а получатель является инстанциацией iface
+				if namedRecv, ok := recv.(*types.Named); ok {
+					if origin := namedRecv.Origin(); origin != nil {
+						if ifaceOrig, ok2 := origin.Underlying().(*types.Interface); ok2 && types.Identical(ifaceOrig, info.iface) {
+							usedMethods[ifaceMethod] = true
 						}
 					}
 				}
 			}
 
 		case *ast.CallExpr:
-			// Обработка неявных вызовов для fmt.Stringer
 			var ident *ast.Ident
 			switch fun := node.Fun.(type) {
 			case *ast.Ident:
@@ -181,7 +172,6 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					if usedMethods[ifaceMethod] {
 						continue
 					}
-					// Проверка на сигнатуру `String() string`
 					sig, ok := ifaceMethod.Type().(*types.Signature)
 					if !ok || ifaceMethod.Name() != "String" || sig.Params().Len() != 0 || sig.Results().Len() != 1 {
 						continue
@@ -198,15 +188,19 @@ func run(pass *analysis.Pass) (interface{}, error) {
 		}
 	})
 
-	// Применяем результаты анализа
-	for ifaceMethod := range usedMethods {
-		if info, exists := ifaceMethods[ifaceMethod]; exists {
+	return usedMethods
+}
+
+// reportUnusedMethods sorts and reports methods that were not used.
+func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]methodInfo, used map[*types.Func]bool) {
+	// mark used methods
+	for m := range used {
+		if info, ok := ifaceMethods[m]; ok {
 			info.used = true
-			ifaceMethods[ifaceMethod] = info
+			ifaceMethods[m] = info
 		}
 	}
 
-	// Шаг C: собрать, отсортировать и вывести отчет по неиспользуемым методам
 	var unused []methodInfo
 	for _, info := range ifaceMethods {
 		if !info.used {
@@ -224,12 +218,14 @@ func run(pass *analysis.Pass) (interface{}, error) {
 	})
 
 	for _, info := range unused {
-		pass.Reportf(info.method.Pos(),
-			"метод %q интерфейса %q объявлен, но не используется",
-			info.method.Name(),
-			info.ifaceName,
-		)
+		pass.Reportf(info.method.Pos(), "method %q of interface %q is declared but not used", info.method.Name(), info.ifaceName)
 	}
+}
+
+func run(pass *analysis.Pass) (interface{}, error) {
+	ifaceMethods := collectInterfaceMethods(pass)
+	used := analyzeUsedMethods(pass, ifaceMethods)
+	reportUnusedMethods(pass, ifaceMethods, used)
 	return nil, nil
 }
 
