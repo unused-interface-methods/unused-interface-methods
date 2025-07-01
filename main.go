@@ -12,6 +12,12 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
+var skipGenerics bool
+
+func init() {
+	Analyzer.Flags.BoolVar(&skipGenerics, "skipGenerics", false, "skip interfaces with type parameters (generics)")
+}
+
 // Analyzer реализует плагины для поиска неиспользуемых методов интерфейсов.
 var Analyzer = &analysis.Analyzer{
 	Name:     "unusedint",
@@ -52,9 +58,11 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					continue
 				}
 
-				// Пропускаем дженерик-интерфейсы (с параметрами типа)
-				if named.TypeParams() != nil && named.TypeParams().Len() > 0 {
-					continue
+				// Опционально пропускаем дженерик-интерфейсы (с параметрами типа)
+				if skipGenerics {
+					if named.TypeParams() != nil && named.TypeParams().Len() > 0 {
+						continue
+					}
 				}
 
 				ifaceType, ok := named.Underlying().(*types.Interface)
@@ -124,6 +132,13 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				}
 
 				if implemented {
+					usedMethods[ifaceMethod] = true
+					continue
+				}
+
+				// --- Generic fallback: match by name and signature for instantiated generic interfaces ---
+				if calledMethod.Name() == ifaceMethod.Name() &&
+					calledMethod.Type().(*types.Signature).String() == ifaceMethod.Type().(*types.Signature).String() {
 					usedMethods[ifaceMethod] = true
 				}
 			}
