@@ -116,9 +116,9 @@ func UseMoreInterfaces() {
 	var reader io.Reader = &File{}
 	reader.Read(nil) // Использует BaseIO.Read
 
-	// Кейс 24: Неявный вызов fmt.Stringer
-	var s Stringer = DataItem{}
-	fmt.Println(s) // Использует Stringer.String
+	// Кейс 24: Использование Stringer через fmt
+	dataItem := DataItem{}
+	fmt.Println(dataItem) // Неявно вызывает String()
 
 	// Кейс 25: Цепочка интерфейсов
 	var t Third = &ChainImpl{}

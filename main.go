@@ -29,8 +29,7 @@ type methodInfo struct {
 
 func run(pass *analysis.Pass) (interface{}, error) {
 	// Шаг A: собрать информацию об интерфейсных методах
-	// map[method] -> list of interfaces that have this method
-	ifaceMethods := map[*types.Func][]methodInfo{}
+	ifaceMethods := map[*types.Func]methodInfo{}
 
 	for _, file := range pass.Files {
 		for _, decl := range file.Decls {
@@ -52,23 +51,28 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				if !ok {
 					continue
 				}
+
+				// Пропускаем дженерик-интерфейсы (с параметрами типа)
+				if named.TypeParams() != nil && named.TypeParams().Len() > 0 {
+					continue
+				}
+
 				ifaceType, ok := named.Underlying().(*types.Interface)
 				if !ok {
 					continue
 				}
 
-				for i := 0; i < ifaceType.NumMethods(); i++ {
-					m := ifaceType.Method(i)
+				for i := 0; i < ifaceType.NumExplicitMethods(); i++ {
+					m := ifaceType.ExplicitMethod(i)
 					if m == nil {
 						continue
 					}
-					info := methodInfo{
+					ifaceMethods[m] = methodInfo{
 						ifaceName: tspec.Name.Name,
 						iface:     ifaceType,
 						method:    m,
 						used:      false,
 					}
-					ifaceMethods[m] = append(ifaceMethods[m], info)
 				}
 			}
 		}
@@ -80,9 +84,13 @@ func run(pass *analysis.Pass) (interface{}, error) {
 		(*ast.SelectorExpr)(nil),
 		(*ast.CallExpr)(nil),
 	}
+
+	usedMethods := make(map[*types.Func]bool)
+
 	ins.Preorder(nodeFilter, func(n ast.Node) {
 		switch node := n.(type) {
 		case *ast.SelectorExpr:
+			// Обработка прямых вызовов методов
 			sel := pass.TypesInfo.Selections[node]
 			if sel == nil || (sel.Kind() != types.MethodVal && sel.Kind() != types.MethodExpr) {
 				return
@@ -91,24 +99,37 @@ func run(pass *analysis.Pass) (interface{}, error) {
 			calledMethod := sel.Obj().(*types.Func)
 			recv := sel.Recv()
 
-			if infos, ok := ifaceMethods[calledMethod]; ok {
-				for i := range infos {
-					info := &infos[i]
-					if !types.IsInterface(recv) {
-						if types.Implements(recv, info.iface) {
-							infos[i].used = true
-						}
-					} else {
-						if recvIface, ok := recv.Underlying().(*types.Interface); ok {
-							if types.Implements(info.iface, recvIface) {
-								infos[i].used = true
-							}
+			for ifaceMethod, info := range ifaceMethods {
+				if usedMethods[ifaceMethod] {
+					continue
+				}
+
+				if ifaceMethod == calledMethod {
+					usedMethods[ifaceMethod] = true
+					continue
+				}
+
+				if calledMethod.Name() != ifaceMethod.Name() ||
+					calledMethod.Type().(*types.Signature).String() != ifaceMethod.Type().(*types.Signature).String() {
+					continue
+				}
+
+				implemented := types.Implements(recv, info.iface)
+				if !implemented {
+					if recvIface, ok := recv.Underlying().(*types.Interface); ok {
+						if types.Implements(info.iface, recvIface) {
+							implemented = true
 						}
 					}
+				}
+
+				if implemented {
+					usedMethods[ifaceMethod] = true
 				}
 			}
 
 		case *ast.CallExpr:
+			// Обработка неявных вызовов для fmt.Stringer
 			var ident *ast.Ident
 			switch fun := node.Fun.(type) {
 			case *ast.Ident:
@@ -130,7 +151,11 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					continue
 				}
 
-				for ifaceMethod, infos := range ifaceMethods {
+				for ifaceMethod, info := range ifaceMethods {
+					if usedMethods[ifaceMethod] {
+						continue
+					}
+					// Проверка на сигнатуру `String() string`
 					sig, ok := ifaceMethod.Type().(*types.Signature)
 					if !ok || ifaceMethod.Name() != "String" || sig.Params().Len() != 0 || sig.Results().Len() != 1 {
 						continue
@@ -139,24 +164,27 @@ func run(pass *analysis.Pass) (interface{}, error) {
 						continue
 					}
 
-					for i := range infos {
-						info := &infos[i]
-						if types.Implements(argType, info.iface) {
-							infos[i].used = true
-						}
+					if types.Implements(argType, info.iface) {
+						usedMethods[ifaceMethod] = true
 					}
 				}
 			}
 		}
 	})
 
+	// Применяем результаты анализа
+	for ifaceMethod := range usedMethods {
+		if info, exists := ifaceMethods[ifaceMethod]; exists {
+			info.used = true
+			ifaceMethods[ifaceMethod] = info
+		}
+	}
+
 	// Шаг C: собрать, отсортировать и вывести отчет по неиспользуемым методам
 	var unused []methodInfo
-	for _, infos := range ifaceMethods {
-		for _, info := range infos {
-			if !info.used {
-				unused = append(unused, info)
-			}
+	for _, info := range ifaceMethods {
+		if !info.used {
+			unused = append(unused, info)
 		}
 	}
 
