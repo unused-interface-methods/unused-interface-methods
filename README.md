@@ -41,13 +41,16 @@
 
 2. **Build the linter:**
    ```bash
-   go build -o unusedintf.exe .
+   # Cross-platform build using Makefile
+   make build
    ```
 
 ### Usage
 
-#### PowerShell Script (Recommended)
-```bash
+#### Cross-Platform Scripts (Recommended)
+
+**Windows (PowerShell):**
+```powershell
 # Run both linters
 ./lint.ps1
 
@@ -58,13 +61,30 @@
 ./lint.ps1 help         # show help
 ```
 
-#### Manual
+**Unix/Linux/macOS (Shell):**
 ```bash
+# Run both linters
+./lint.sh
+
+# Run specific linter
+./lint.sh standard     # golangci-lint only
+./lint.sh interfaces   # unused interface methods only
+./lint.sh test         # run tests
+./lint.sh help         # show help
+```
+
+#### Manual (Cross-Platform)
+```bash
+# Build first
+make build
+
 # Standard linting
 golangci-lint run .
 
-# Unused interface methods
-./unusedintf.exe ./...
+# Unused interface methods (binary name varies by OS)
+# On Windows: ./unusedintf.exe ./...
+# On Unix/Linux/macOS: ./unusedintf ./...
+make lint-interfaces
 ```
 
 ## 📋 Sample Output
@@ -93,11 +113,22 @@ analyzers := []*analysis.Analyzer{
 ### CI/CD Pipeline
 
 ```yaml
-# GitHub Actions example
+# GitHub Actions example (cross-platform)
 - name: 🔍 Check unused interface methods
   run: |
-    go build -o unusedintf ./cmd/unusedintf
-    ./unusedintf ./...
+    make build
+    make lint-interfaces
+
+# Alternative using direct commands
+- name: 🔍 Check unused interface methods (manual)
+  run: |
+    if [[ "$RUNNER_OS" == "Windows" ]]; then
+      go build -o unusedintf.exe .
+      ./unusedintf.exe ./...
+    else
+      go build -o unusedintf .
+      ./unusedintf ./...
+    fi
 ```
 
 ## ⚠️ Known Limitations

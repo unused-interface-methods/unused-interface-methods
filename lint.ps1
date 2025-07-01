@@ -6,9 +6,12 @@ param(
   [string]$Target = "all"
 )
 
+# Detect OS and set binary name
+$BinaryName = if ($IsWindows -or ($env:OS -eq "Windows_NT")) { "unusedintf.exe" } else { "unusedintf" }
+
 function Build-Linter {
   Write-Host "Building unusedintf linter..." -ForegroundColor Yellow
-  go build -o unusedintf.exe .
+  go build -o $BinaryName .
   if ($LASTEXITCODE -eq 0) {
     Write-Host "✅ Build successful" -ForegroundColor Green
   }
@@ -32,7 +35,7 @@ function Run-StandardLint {
 function Run-InterfaceLint {
   Write-Host "Running unused interface methods linter..." -ForegroundColor Yellow
   Build-Linter
-  ./unusedintf.exe ./...
+  & "./$BinaryName" ./...
   if ($LASTEXITCODE -eq 0) {
     Write-Host "✅ No unused interface methods" -ForegroundColor Green
   }
@@ -50,9 +53,9 @@ function Run-Tests {
 
 function Clean-Artifacts {
   Write-Host "Cleaning build artifacts..." -ForegroundColor Yellow
-  if (Test-Path "unusedintf.exe") {
-    Remove-Item "unusedintf.exe"
-    Write-Host "✅ Cleaned unusedintf.exe" -ForegroundColor Green
+  if (Test-Path $BinaryName) {
+    Remove-Item $BinaryName
+    Write-Host "✅ Cleaned $BinaryName" -ForegroundColor Green
   }
 }
 

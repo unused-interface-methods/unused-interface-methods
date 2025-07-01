@@ -1,8 +1,17 @@
+# Detect OS and set binary extension
+ifeq ($(OS),Windows_NT)
+    BINARY_NAME = unusedintf.exe
+    RM_CMD = del /f /q
+else
+    BINARY_NAME = unusedintf
+    RM_CMD = rm -f
+endif
+
 .PHONY: lint build test clean all
 
 # Build the custom linter
 build:
-	go build -o unusedintf.exe .
+	go build -o $(BINARY_NAME) .
 
 # Run golangci-lint
 lint-standard:
@@ -10,7 +19,7 @@ lint-standard:
 
 # Run our custom unused interface method linter
 lint-interfaces: build
-	./unusedintf.exe ./...
+	./$(BINARY_NAME) ./...
 
 # Run both linters
 lint: lint-standard lint-interfaces
@@ -22,7 +31,7 @@ test:
 
 # Clean build artifacts
 clean:
-	rm -f unusedintf.exe
+	$(RM_CMD) $(BINARY_NAME)
 
 # Run everything
 all: test lint
