@@ -12,6 +12,26 @@
 
 `unused-interface-methods` is a **powerful static analysis tool** for Go that detects interface methods that are **declared but never used** anywhere in your codebase. Built on top of [golang.org/x/tools/go/analysis](https://pkg.go.dev/golang.org/x/tools/go/analysis), it seamlessly integrates with your development workflow.
 
+## 🤔 Problem
+
+```go
+package some_name
+
+// Partially implemented interface
+type Interface interface {
+    SomeMethod()
+    UnusedMethod() // unused for SomeObject - can be removed
+}
+
+type SomeObject struct {
+    i Interface
+}
+
+func (o *SomeObject) SomeMethod() {
+    o.i.SomeMethod() // definitely used interface method
+}
+```
+
 ### 💡 Why You Need This
 
 - 🧹 **Clean APIs**: Dead interface methods confuse users and bloat your public API
