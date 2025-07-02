@@ -55,7 +55,7 @@
 			<div id="nav">
 				<select id="files">
 				
-				<option value="file0">github.com/unused-interface-methods/unused-interface-methods/main.go (93.9%)</option>
+				<option value="file0">github.com/unused-interface-methods/unused-interface-methods/main.go (94.2%)</option>
 				
 				</select>
 			</div>
@@ -85,6 +85,7 @@ import (
         "go/token"
         "go/types"
         "sort"
+        "strings"
 
         "golang.org/x/tools/go/analysis"
         "golang.org/x/tools/go/analysis/passes/inspect"
@@ -361,13 +362,13 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
                 }</span>
         }
 
-        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="354">{
+        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="331">{
                 posI := pass.Fset.Position(unused[i].method.Pos())
                 posJ := pass.Fset.Position(unused[j].method.Pos())
-                if posI.Filename != posJ.Filename </span><span class="cov5" title="116">{
+                if posI.Filename != posJ.Filename </span><span class="cov5" title="72">{
                         return posI.Filename &lt; posJ.Filename
                 }</span>
-                <span class="cov6" title="238">return posI.Line &lt; posJ.Line</span>
+                <span class="cov6" title="259">return posI.Line &lt; posJ.Line</span>
         })
 
         <span class="cov1" title="1">for _, info := range unused </span><span class="cov4" title="59">{
@@ -376,11 +377,24 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
 }
 
 func run(pass *analysis.Pass) (interface{}, error) <span class="cov1" title="1">{
+        // Filter out test files
+        files := make([]*ast.File, 0, len(pass.Files))
+        for _, file := range pass.Files </span><span class="cov2" title="3">{
+                if !strings.HasSuffix(pass.Fset.Position(file.Pos()).Filename, "_test.go") </span><span class="cov2" title="3">{
+                        files = append(files, file)
+                }</span>
+        }
+
+        // Use filtered files
+        <span class="cov1" title="1">pass.Files = files
+
+        // Continue with normal analysis
         ifaceMethods := collectInterfaceMethods(pass)
         used := analyzeUsedMethods(pass, ifaceMethods)
         reportUnusedMethods(pass, ifaceMethods, used)
-        return nil, nil
-}</span>
+
+        return nil, nil</span>
+}
 
 func main() <span class="cov0" title="0">{
         singlechecker.Main(Analyzer)
