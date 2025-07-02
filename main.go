@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"go/types"
 	"sort"
+	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -296,9 +297,22 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
 }
 
 func run(pass *analysis.Pass) (interface{}, error) {
+	// Skip packages not from the current module
+	if pass.Module == nil {
+		// This could be standard library or external dependency
+		return nil, nil
+	}
+
+	// Skip if package path doesn't belong to current module
+	if !strings.HasPrefix(pass.Pkg.Path(), pass.Module.Path) {
+		return nil, nil
+	}
+
+	// Continue with the analysis for packages from the current module
 	ifaceMethods := collectInterfaceMethods(pass)
 	used := analyzeUsedMethods(pass, ifaceMethods)
 	reportUnusedMethods(pass, ifaceMethods, used)
+
 	return nil, nil
 }
 
