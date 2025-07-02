@@ -1,13 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
-	"os"
 	"sort"
-	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -299,33 +296,9 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
 }
 
 func run(pass *analysis.Pass) (interface{}, error) {
-	// Detailed debug logging
-	fmt.Fprintf(os.Stderr, "=== Analysis Start ===\n")
-	fmt.Fprintf(os.Stderr, "Package: %s\n", pass.Pkg.Path())
-	fmt.Fprintf(os.Stderr, "Package Imports Count: %v\n", len(pass.Pkg.Imports()))
-
-	if pass.Module != nil {
-		fmt.Fprintf(os.Stderr, "Module Info:\n")
-		fmt.Fprintf(os.Stderr, "  - Path: %s\n", pass.Module.Path)
-		fmt.Fprintf(os.Stderr, "  - Version: %s\n", pass.Module.Version)
-	} else {
-		fmt.Fprintf(os.Stderr, "No module info available\n")
-	}
-
-	// Check if this is an external dependency
-	if strings.Contains(pass.Pkg.Path(), "github.com/zelenin/go-tdlib") ||
-		strings.Contains(pass.Pkg.Path(), "github.com/comerc/go-tdlib") {
-		fmt.Fprintf(os.Stderr, "Skipping tdlib dependency: %s\n", pass.Pkg.Path())
-		return nil, nil
-	}
-
-	fmt.Fprintf(os.Stderr, "=== Starting Analysis ===\n")
-
-	// Continue with normal analysis
 	ifaceMethods := collectInterfaceMethods(pass)
 	used := analyzeUsedMethods(pass, ifaceMethods)
 	reportUnusedMethods(pass, ifaceMethods, used)
-
 	return nil, nil
 }
 
