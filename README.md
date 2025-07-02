@@ -94,13 +94,6 @@ analyzers := []*analysis.Analyzer{
 }
 ```
 
-## ⚠️ Known Limitations
-
-- 🪞 **Reflection**: Cannot track `reflect.Value.Call()` usage
-- 🤖 **Code Generation**: Dynamic/generated code is not analyzed
-- 🔌 **Plugins**: Runtime plugin loading is not tracked
-- 🧪 **Generics**: Best-effort matching; edge cases may slip through
-
 ## 🔨 Development
 
 ```bash
@@ -112,6 +105,13 @@ git clone https://github.com/unused-interface-methods/unused-interface-methods.g
 cd unused-interface-methods
 make build
 ```
+
+## ⚠️ Known Limitations
+
+- 🪞 **Reflection**: Cannot track `reflect.Value.Call()` usage
+- 🤖 **Code Generation**: Dynamic/generated code is not analyzed
+- 🔌 **Plugins**: Runtime plugin loading is not tracked
+- 🧪 **Generics**: Best-effort matching; edge cases may slip through
 
 ## 🤝 Contributing
 
