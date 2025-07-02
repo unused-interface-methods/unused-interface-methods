@@ -50,9 +50,7 @@ jobs:
         uses: tj-actions/verify-changed-files@v16
         id: verify-changed-files
         with:
-          files: |
-            README.md
-            .coverage/.out
+          files: README.md
 
       - name: Commit changes
         if: steps.verify-changed-files.outputs.files_changed == 'true'
