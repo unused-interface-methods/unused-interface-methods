@@ -55,7 +55,7 @@
 			<div id="nav">
 				<select id="files">
 				
-				<option value="file0">github.com/unused-interface-methods/unused-interface-methods/main.go (92.1%)</option>
+				<option value="file0">github.com/unused-interface-methods/unused-interface-methods/main.go (93.9%)</option>
 				
 				</select>
 			</div>
@@ -81,13 +81,10 @@
 		<pre class="file" id="file0" style="display: none">package main
 
 import (
-        "fmt"
         "go/ast"
         "go/token"
         "go/types"
-        "os"
         "sort"
-        "strings"
 
         "golang.org/x/tools/go/analysis"
         "golang.org/x/tools/go/analysis/passes/inspect"
@@ -364,10 +361,10 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
                 }</span>
         }
 
-        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="356">{
+        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="354">{
                 posI := pass.Fset.Position(unused[i].method.Pos())
                 posJ := pass.Fset.Position(unused[j].method.Pos())
-                if posI.Filename != posJ.Filename </span><span class="cov5" title="118">{
+                if posI.Filename != posJ.Filename </span><span class="cov5" title="116">{
                         return posI.Filename &lt; posJ.Filename
                 }</span>
                 <span class="cov6" title="238">return posI.Line &lt; posJ.Line</span>
@@ -379,35 +376,11 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
 }
 
 func run(pass *analysis.Pass) (interface{}, error) <span class="cov1" title="1">{
-        // Detailed debug logging
-        fmt.Fprintf(os.Stderr, "=== Analysis Start ===\n")
-        fmt.Fprintf(os.Stderr, "Package: %s\n", pass.Pkg.Path())
-        fmt.Fprintf(os.Stderr, "Package Imports Count: %v\n", len(pass.Pkg.Imports()))
-
-        if pass.Module != nil </span><span class="cov1" title="1">{
-                fmt.Fprintf(os.Stderr, "Module Info:\n")
-                fmt.Fprintf(os.Stderr, "  - Path: %s\n", pass.Module.Path)
-                fmt.Fprintf(os.Stderr, "  - Version: %s\n", pass.Module.Version)
-        }</span> else<span class="cov0" title="0"> {
-                fmt.Fprintf(os.Stderr, "No module info available\n")
-        }</span>
-
-        // Check if this is an external dependency
-        <span class="cov1" title="1">if strings.Contains(pass.Pkg.Path(), "github.com/zelenin/go-tdlib") ||
-                strings.Contains(pass.Pkg.Path(), "github.com/comerc/go-tdlib") </span><span class="cov0" title="0">{
-                fmt.Fprintf(os.Stderr, "Skipping tdlib dependency: %s\n", pass.Pkg.Path())
-                return nil, nil
-        }</span>
-
-        <span class="cov1" title="1">fmt.Fprintf(os.Stderr, "=== Starting Analysis ===\n")
-
-        // Continue with normal analysis
         ifaceMethods := collectInterfaceMethods(pass)
         used := analyzeUsedMethods(pass, ifaceMethods)
         reportUnusedMethods(pass, ifaceMethods, used)
-
-        return nil, nil</span>
-}
+        return nil, nil
+}</span>
 
 func main() <span class="cov0" title="0">{
         singlechecker.Main(Analyzer)
