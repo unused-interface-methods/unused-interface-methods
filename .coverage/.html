@@ -360,13 +360,13 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
                 }</span>
         }
 
-        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="353">{
+        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="345">{
                 posI := pass.Fset.Position(unused[i].method.Pos())
                 posJ := pass.Fset.Position(unused[j].method.Pos())
-                if posI.Filename != posJ.Filename </span><span class="cov5" title="91">{
+                if posI.Filename != posJ.Filename </span><span class="cov5" title="90">{
                         return posI.Filename &lt; posJ.Filename
                 }</span>
-                <span class="cov6" title="262">return posI.Line &lt; posJ.Line</span>
+                <span class="cov6" title="255">return posI.Line &lt; posJ.Line</span>
         })
 
         <span class="cov1" title="1">for _, info := range unused </span><span class="cov4" title="59">{
