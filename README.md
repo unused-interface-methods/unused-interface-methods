@@ -47,8 +47,6 @@ make build
 
 `Ctrl+Shift+P` (`Cmd_Shift+P` on Mac) → "Tasks: Run Task" → "Go: Check Unused Interface Methods"
 
-Or via plugin: https://github.com/unused-interface-methods/vscode-plugin
-
 ### ✨ Features
 
 - ✅ **Real-time highlighting** of unused interface methods
