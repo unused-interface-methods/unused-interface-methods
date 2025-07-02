@@ -6,7 +6,7 @@
       "type": "shell",
       "command": "${command:go.buildTags}",
       "windows": {
-        "command": "unused-interface-methods"
+        "command": "unused-interface-methods.exe"
       },
       "linux": {
         "command": "unused-interface-methods"
