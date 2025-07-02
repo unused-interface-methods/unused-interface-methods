@@ -20,6 +20,7 @@ var Analyzer = &analysis.Analyzer{
 	Run:      run,
 }
 
+// methodInfo represents information about a method in an interface.
 type methodInfo struct {
 	ifaceName string           // interface name
 	iface     *types.Interface // interface object
