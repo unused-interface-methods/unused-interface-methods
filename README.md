@@ -1,4 +1,5 @@
 # unused-interface-methods
+[![coverage](https://img.shields.io/badge/coverage-93.9%25-brightgreen)](https://htmlpreview.github.io/?https://github.com/unused-interface-methods/unused-interface-methods/blob/main/.coverage/.html)
 
 [![Go Version](https://img.shields.io/github/go-mod/go-version/unused-interface-methods/unused-interface-methods)](https://go.dev/doc/install)
 [![Go Report Card](https://goreportcard.com/badge/github.com/unused-interface-methods/unused-interface-methods)](https://goreportcard.com/report/github.com/unused-interface-methods/unused-interface-methods)

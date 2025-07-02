@@ -1,0 +1,418 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>unused-interface-methods: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/unused-interface-methods/unused-interface-methods/main.go (93.9%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">no coverage</span>
+				<span class="cov1">low coverage</span>
+				<span class="cov2">*</span>
+				<span class="cov3">*</span>
+				<span class="cov4">*</span>
+				<span class="cov5">*</span>
+				<span class="cov6">*</span>
+				<span class="cov7">*</span>
+				<span class="cov8">*</span>
+				<span class="cov9">*</span>
+				<span class="cov10">high coverage</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package main
+
+import (
+        "go/ast"
+        "go/token"
+        "go/types"
+        "sort"
+
+        "golang.org/x/tools/go/analysis"
+        "golang.org/x/tools/go/analysis/passes/inspect"
+        "golang.org/x/tools/go/analysis/singlechecker"
+        "golang.org/x/tools/go/ast/inspector"
+)
+
+// Analyzer implements plugins for finding unused interface methods.
+var Analyzer = &amp;analysis.Analyzer{
+        Name:     "unusedintf",
+        Doc:      "finds interface methods that are declared but not used in the code",
+        Requires: []*analysis.Analyzer{inspect.Analyzer},
+        Run:      run,
+}
+
+type methodInfo struct {
+        ifaceName string           // interface name
+        iface     *types.Interface // interface object
+        method    *types.Func      // method object
+        used      bool             // used flag
+}
+
+// collectInterfaceMethods collects all explicit interface methods in the package.
+func collectInterfaceMethods(pass *analysis.Pass) map[*types.Func]methodInfo <span class="cov1" title="1">{
+        ifaceMethods := map[*types.Func]methodInfo{}
+        for _, file := range pass.Files </span><span class="cov2" title="3">{
+                for _, decl := range file.Decls </span><span class="cov5" title="122">{
+                        gd, ok := decl.(*ast.GenDecl)
+                        if !ok || gd.Tok != token.TYPE </span><span class="cov4" title="49">{
+                                continue</span>
+                        }
+                        <span class="cov5" title="73">for _, spec := range gd.Specs </span><span class="cov5" title="73">{
+                                tspec := spec.(*ast.TypeSpec)
+                                if _, ok := tspec.Type.(*ast.InterfaceType); !ok </span><span class="cov3" title="20">{
+                                        continue</span>
+                                }
+                                <span class="cov4" title="53">obj := pass.TypesInfo.Defs[tspec.Name]
+                                if obj == nil </span><span class="cov0" title="0">{
+                                        continue</span>
+                                }
+                                <span class="cov4" title="53">named, ok := obj.Type().(*types.Named)
+                                if !ok </span><span class="cov0" title="0">{
+                                        continue</span>
+                                }
+                                <span class="cov4" title="53">ifaceType, ok := named.Underlying().(*types.Interface)
+                                if !ok </span><span class="cov0" title="0">{
+                                        continue</span>
+                                }
+                                <span class="cov4" title="53">for i := 0; i &lt; ifaceType.NumExplicitMethods(); i++ </span><span class="cov5" title="122">{
+                                        m := ifaceType.ExplicitMethod(i)
+                                        if m == nil </span><span class="cov0" title="0">{
+                                                continue</span>
+                                        }
+                                        <span class="cov5" title="122">ifaceMethods[m] = methodInfo{
+                                                ifaceName: tspec.Name.Name,
+                                                iface:     ifaceType,
+                                                method:    m,
+                                                used:      false,
+                                        }</span>
+                                }
+                        }
+                }
+        }
+
+        <span class="cov1" title="1">return ifaceMethods</span>
+}
+
+// methodAnalyzer handles analysis of method usage in AST
+type methodAnalyzer struct {
+        pass         *analysis.Pass
+        ifaceMethods map[*types.Func]methodInfo
+        usedMethods  map[*types.Func]bool
+}
+
+// newMethodAnalyzer creates a new method analyzer
+func newMethodAnalyzer(pass *analysis.Pass, ifaceMethods map[*types.Func]methodInfo) *methodAnalyzer <span class="cov1" title="1">{
+        return &amp;methodAnalyzer{
+                pass:         pass,
+                ifaceMethods: ifaceMethods,
+                usedMethods:  make(map[*types.Func]bool),
+        }
+}</span>
+
+// analyzeUsedMethods traverses AST and marks used methods
+func analyzeUsedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]methodInfo) map[*types.Func]bool <span class="cov1" title="1">{
+        analyzer := newMethodAnalyzer(pass, ifaceMethods)
+        return analyzer.analyze()
+}</span>
+
+// analyze performs the main analysis logic
+func (ma *methodAnalyzer) analyze() map[*types.Func]bool <span class="cov1" title="1">{
+        ins := ma.pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
+
+        nodeFilter := []ast.Node{
+                (*ast.SelectorExpr)(nil),
+                (*ast.CallExpr)(nil),
+        }
+
+        ins.Preorder(nodeFilter, func(n ast.Node) </span><span class="cov6" title="282">{
+                switch node := n.(type) </span>{
+                case *ast.SelectorExpr:<span class="cov5" title="172">
+                        ma.analyzeSelectorExpr(node)</span>
+                case *ast.CallExpr:<span class="cov5" title="110">
+                        ma.analyzeCallExpr(node)</span>
+                }
+        })
+
+        <span class="cov1" title="1">return ma.usedMethods</span>
+}
+
+// analyzeSelectorExpr handles method calls through selectors
+func (ma *methodAnalyzer) analyzeSelectorExpr(node *ast.SelectorExpr) <span class="cov5" title="172">{
+        sel := ma.pass.TypesInfo.Selections[node]
+        if sel == nil || (sel.Kind() != types.MethodVal &amp;&amp; sel.Kind() != types.MethodExpr) </span><span class="cov5" title="82">{
+                return
+        }</span>
+
+        <span class="cov5" title="90">calledMethod := sel.Obj().(*types.Func)
+        recv := sel.Recv()
+
+        ma.markMatchingMethods(calledMethod, recv)</span>
+}
+
+// markMatchingMethods marks interface methods that match the called method
+func (ma *methodAnalyzer) markMatchingMethods(calledMethod *types.Func, recv types.Type) <span class="cov5" title="90">{
+        for ifaceMethod, info := range ma.ifaceMethods </span><span class="cov10" title="10980">{
+                if ma.usedMethods[ifaceMethod] </span><span class="cov8" title="3648">{
+                        continue</span>
+                }
+
+                <span class="cov9" title="7332">if ma.isMethodMatch(calledMethod, ifaceMethod, recv, info) </span><span class="cov4" title="62">{
+                        ma.usedMethods[ifaceMethod] = true
+                }</span>
+        }
+}
+
+// isMethodMatch checks if called method matches interface method
+func (ma *methodAnalyzer) isMethodMatch(calledMethod, ifaceMethod *types.Func, recv types.Type, info methodInfo) bool <span class="cov9" title="7332">{
+        // direct match
+        if calledMethod == ifaceMethod </span><span class="cov4" title="47">{
+                return true
+        }</span>
+
+        // name mismatch
+        <span class="cov9" title="7285">if calledMethod.Name() != ifaceMethod.Name() </span><span class="cov9" title="7231">{
+                return false
+        }</span>
+
+        // check if receiver implements interface
+        <span class="cov4" title="54">return ma.checkImplements(recv, info)</span>
+}
+
+// checkImplements checks if receiver type implements the interface
+func (ma *methodAnalyzer) checkImplements(recv types.Type, info methodInfo) bool <span class="cov4" title="54">{
+        // direct implementation
+        if types.Implements(recv, info.iface) </span><span class="cov2" title="7">{
+                return true
+        }</span>
+
+        // interface-to-interface check
+        <span class="cov4" title="47">if recvIface, ok := recv.Underlying().(*types.Interface); ok </span><span class="cov4" title="41">{
+                if types.Implements(info.iface, recvIface) </span><span class="cov2" title="3">{
+                        return true
+                }</span>
+        }
+
+        // generic type check
+        <span class="cov4" title="44">return ma.checkGenericImplements(recv, info)</span>
+}
+
+// checkGenericImplements handles generic type implementations
+func (ma *methodAnalyzer) checkGenericImplements(recv types.Type, info methodInfo) bool <span class="cov4" title="44">{
+        namedRecv, ok := recv.(*types.Named)
+        if !ok </span><span class="cov1" title="2">{
+                return false
+        }</span>
+
+        <span class="cov4" title="42">origin := namedRecv.Origin()
+        if origin == nil </span><span class="cov0" title="0">{
+                return false
+        }</span>
+
+        <span class="cov4" title="42">ifaceOrig, ok := origin.Underlying().(*types.Interface)
+        return ok &amp;&amp; types.Identical(ifaceOrig, info.iface)</span>
+}
+
+// analyzeCallExpr handles function calls (specifically fmt.* functions)
+func (ma *methodAnalyzer) analyzeCallExpr(node *ast.CallExpr) <span class="cov5" title="110">{
+        ident := ma.extractFunctionIdent(node)
+        if ident == nil </span><span class="cov2" title="4">{
+                return
+        }</span>
+
+        <span class="cov5" title="106">if !ma.isFmtFunction(ident) </span><span class="cov5" title="105">{
+                return
+        }</span>
+
+        <span class="cov1" title="1">ma.analyzeFmtCall(node)</span>
+}
+
+// extractFunctionIdent extracts function identifier from call expression
+func (ma *methodAnalyzer) extractFunctionIdent(node *ast.CallExpr) *ast.Ident <span class="cov5" title="110">{
+        switch fun := node.Fun.(type) </span>{
+        case *ast.Ident:<span class="cov2" title="7">
+                return fun</span>
+        case *ast.SelectorExpr:<span class="cov5" title="99">
+                return fun.Sel</span>
+        default:<span class="cov2" title="4">
+                return nil</span>
+        }
+}
+
+// isFmtFunction checks if the function belongs to fmt package
+func (ma *methodAnalyzer) isFmtFunction(ident *ast.Ident) bool <span class="cov5" title="106">{
+        fn, ok := ma.pass.TypesInfo.Uses[ident].(*types.Func)
+        return ok &amp;&amp; fn.Pkg() != nil &amp;&amp; fn.Pkg().Path() == "fmt"
+}</span>
+
+// analyzeFmtCall analyzes fmt function calls for Stringer interface usage
+func (ma *methodAnalyzer) analyzeFmtCall(node *ast.CallExpr) <span class="cov1" title="1">{
+        for _, arg := range node.Args </span><span class="cov1" title="1">{
+                argType := ma.pass.TypesInfo.TypeOf(arg)
+                if argType == nil </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+
+                <span class="cov1" title="1">ma.checkStringerUsage(argType)</span>
+        }
+}
+
+// checkStringerUsage checks if argument implements Stringer interface
+func (ma *methodAnalyzer) checkStringerUsage(argType types.Type) <span class="cov1" title="1">{
+        for ifaceMethod, info := range ma.ifaceMethods </span><span class="cov5" title="122">{
+                if ma.usedMethods[ifaceMethod] </span><span class="cov4" title="54">{
+                        continue</span>
+                }
+
+                <span class="cov5" title="68">if ma.isStringerMethod(ifaceMethod) &amp;&amp; types.Implements(argType, info.iface) </span><span class="cov1" title="1">{
+                        ma.usedMethods[ifaceMethod] = true
+                }</span>
+        }
+}
+
+// isStringerMethod checks if method is String() string
+func (ma *methodAnalyzer) isStringerMethod(method *types.Func) bool <span class="cov5" title="68">{
+        if method.Name() != "String" </span><span class="cov5" title="66">{
+                return false
+        }</span>
+
+        <span class="cov1" title="2">sig, ok := method.Type().(*types.Signature)
+        if !ok || sig.Params().Len() != 0 || sig.Results().Len() != 1 </span><span class="cov1" title="1">{
+                return false
+        }</span>
+
+        <span class="cov1" title="1">basic, ok := sig.Results().At(0).Type().(*types.Basic)
+        return ok &amp;&amp; basic.Kind() == types.String</span>
+}
+
+// reportUnusedMethods sorts and reports methods that were not used.
+func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]methodInfo, used map[*types.Func]bool) <span class="cov1" title="1">{
+        // mark used methods
+        for m := range used </span><span class="cov5" title="63">{
+                if info, ok := ifaceMethods[m]; ok </span><span class="cov5" title="63">{
+                        info.used = true
+                        ifaceMethods[m] = info
+                }</span>
+        }
+
+        <span class="cov1" title="1">var unused []methodInfo
+        for _, info := range ifaceMethods </span><span class="cov5" title="122">{
+                if !info.used </span><span class="cov4" title="59">{
+                        unused = append(unused, info)
+                }</span>
+        }
+
+        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="354">{
+                posI := pass.Fset.Position(unused[i].method.Pos())
+                posJ := pass.Fset.Position(unused[j].method.Pos())
+                if posI.Filename != posJ.Filename </span><span class="cov5" title="118">{
+                        return posI.Filename &lt; posJ.Filename
+                }</span>
+                <span class="cov6" title="236">return posI.Line &lt; posJ.Line</span>
+        })
+
+        <span class="cov1" title="1">for _, info := range unused </span><span class="cov4" title="59">{
+                pass.Reportf(info.method.Pos(), "method %q of interface %q is declared but not used", info.method.Name(), info.ifaceName)
+        }</span>
+}
+
+func run(pass *analysis.Pass) (interface{}, error) <span class="cov1" title="1">{
+        ifaceMethods := collectInterfaceMethods(pass)
+        used := analyzeUsedMethods(pass, ifaceMethods)
+        reportUnusedMethods(pass, ifaceMethods, used)
+        return nil, nil
+}</span>
+
+func main() <span class="cov0" title="0">{
+        singlechecker.Main(Analyzer)
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
