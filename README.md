@@ -61,7 +61,7 @@ go install github.com/unused-interface-methods/unused-interface-methods@latest
 
 ## 🔧 VS Code Integration
 
-`Ctrl+Shift+P` (`Cmd_Shift+P` on Mac) → "Tasks: Run Task" → "Go: Check Unused Interface Methods"
+`Ctrl+Shift+P` (`Cmd+Shift+P` on Mac) → "Tasks: Run Task" → "Go: Check Unused Interface Methods"
 
 ### ✨ Features
 
