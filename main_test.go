@@ -1,12 +1,12 @@
 package main
 
-// import (
-// 	"testing"
+import (
+	"testing"
 
-// 	"golang.org/x/tools/go/analysis/analysistest"
-// )
+	"golang.org/x/tools/go/analysis/analysistest"
+)
 
-// func TestAnalyzer(t *testing.T) {
-// 	testdata := analysistest.TestData()
-// 	analysistest.Run(t, testdata, Analyzer, "test")
-// }
+func TestAnalyzer(t *testing.T) {
+	testdata := analysistest.TestData()
+	analysistest.Run(t, testdata, Analyzer, "test")
+}
