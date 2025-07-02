@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -297,6 +298,17 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
 }
 
 func run(pass *analysis.Pass) (interface{}, error) {
+	// Debug logging
+	fmt.Printf("Package: %s\n", pass.Pkg.Path())
+	if pass.Module != nil {
+		fmt.Printf("Module: %s (Path: %s, Version: %s)\n",
+			pass.Module.Path,
+			pass.Pkg.Path(),
+			pass.Module.Version)
+	} else {
+		fmt.Printf("Module is nil for package: %s\n", pass.Pkg.Path())
+	}
+
 	// Skip packages not from the current module
 	if pass.Module == nil {
 		// This could be standard library or external dependency
