@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"os"
 	"sort"
 	"strings"
 
@@ -16,7 +17,7 @@ import (
 
 // Analyzer implements plugins for finding unused interface methods.
 var Analyzer = &analysis.Analyzer{
-	Name:     "unusedintf",
+	Name:     "unused-interface-methods",
 	Doc:      "finds interface methods that are declared but not used in the code",
 	Requires: []*analysis.Analyzer{inspect.Analyzer},
 	Run:      run,
@@ -298,29 +299,29 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
 }
 
 func run(pass *analysis.Pass) (interface{}, error) {
-	// Debug logging
-	fmt.Printf("Package: %s\n", pass.Pkg.Path())
+	// Detailed debug logging
+	fmt.Fprintf(os.Stderr, "=== Analysis Start ===\n")
+	fmt.Fprintf(os.Stderr, "Package: %s\n", pass.Pkg.Path())
+	fmt.Fprintf(os.Stderr, "Package Imports Count: %v\n", len(pass.Pkg.Imports()))
+
 	if pass.Module != nil {
-		fmt.Printf("Module: %s (Path: %s, Version: %s)\n",
-			pass.Module.Path,
-			pass.Pkg.Path(),
-			pass.Module.Version)
+		fmt.Fprintf(os.Stderr, "Module Info:\n")
+		fmt.Fprintf(os.Stderr, "  - Path: %s\n", pass.Module.Path)
+		fmt.Fprintf(os.Stderr, "  - Version: %s\n", pass.Module.Version)
 	} else {
-		fmt.Printf("Module is nil for package: %s\n", pass.Pkg.Path())
+		fmt.Fprintf(os.Stderr, "No module info available\n")
 	}
 
-	// Skip packages not from the current module
-	if pass.Module == nil {
-		// This could be standard library or external dependency
+	// Check if this is an external dependency
+	if strings.Contains(pass.Pkg.Path(), "github.com/zelenin/go-tdlib") ||
+		strings.Contains(pass.Pkg.Path(), "github.com/comerc/go-tdlib") {
+		fmt.Fprintf(os.Stderr, "Skipping tdlib dependency: %s\n", pass.Pkg.Path())
 		return nil, nil
 	}
 
-	// Skip if package path doesn't belong to current module
-	if !strings.HasPrefix(pass.Pkg.Path(), pass.Module.Path) {
-		return nil, nil
-	}
+	fmt.Fprintf(os.Stderr, "=== Starting Analysis ===\n")
 
-	// Continue with the analysis for packages from the current module
+	// Continue with normal analysis
 	ifaceMethods := collectInterfaceMethods(pass)
 	used := analyzeUsedMethods(pass, ifaceMethods)
 	reportUnusedMethods(pass, ifaceMethods, used)
