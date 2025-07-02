@@ -17,8 +17,8 @@ import (
 
 // Analyzer implements plugins for finding unused interface methods.
 var Analyzer = &analysis.Analyzer{
-	Name:     "unused-interface-methods",
-	Doc:      "finds interface methods that are declared but not used in the code",
+	Name:     "unused_interface_methods",
+	Doc:      "Checks for unused interface methods",
 	Requires: []*analysis.Analyzer{inspect.Analyzer},
 	Run:      run,
 }
