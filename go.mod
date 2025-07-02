@@ -1,4 +1,4 @@
-module lint
+module github.com/unused-interface-methods/unused-interface-methods
 
 go 1.24.2
 

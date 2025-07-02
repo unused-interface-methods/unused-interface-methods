@@ -12,12 +12,6 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-var skipGenerics bool
-
-func init() {
-	Analyzer.Flags.BoolVar(&skipGenerics, "skipGenerics", false, "skip interfaces with type parameters (generics)")
-}
-
 // Analyzer implements plugins for finding unused interface methods.
 var Analyzer = &analysis.Analyzer{
 	Name:     "unusedintf",
@@ -27,16 +21,15 @@ var Analyzer = &analysis.Analyzer{
 }
 
 type methodInfo struct {
-	ifaceName string           // имя интерфейса
-	iface     *types.Interface // объект интерфейса
-	method    *types.Func      // объект метода
-	used      bool             // флаг использования
+	ifaceName string           // interface name
+	iface     *types.Interface // interface object
+	method    *types.Func      // method object
+	used      bool             // used flag
 }
 
 // collectInterfaceMethods collects all explicit interface methods in the package.
 func collectInterfaceMethods(pass *analysis.Pass) map[*types.Func]methodInfo {
 	ifaceMethods := map[*types.Func]methodInfo{}
-
 	for _, file := range pass.Files {
 		for _, decl := range file.Decls {
 			gd, ok := decl.(*ast.GenDecl)
@@ -48,7 +41,6 @@ func collectInterfaceMethods(pass *analysis.Pass) map[*types.Func]methodInfo {
 				if _, ok := tspec.Type.(*ast.InterfaceType); !ok {
 					continue
 				}
-
 				obj := pass.TypesInfo.Defs[tspec.Name]
 				if obj == nil {
 					continue
@@ -57,17 +49,10 @@ func collectInterfaceMethods(pass *analysis.Pass) map[*types.Func]methodInfo {
 				if !ok {
 					continue
 				}
-
-				// Skip generic interfaces when necessary.
-				if skipGenerics && named.TypeParams() != nil && named.TypeParams().Len() > 0 {
-					continue
-				}
-
 				ifaceType, ok := named.Underlying().(*types.Interface)
 				if !ok {
 					continue
 				}
-
 				for i := 0; i < ifaceType.NumExplicitMethods(); i++ {
 					m := ifaceType.ExplicitMethod(i)
 					if m == nil {

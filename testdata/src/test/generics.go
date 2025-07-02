@@ -1,16 +1,16 @@
-package test_data
+package test
 
 // ===============================
-// ДЖЕНЕРИК-ИНТЕРФЕЙСЫ
+// GENERIC INTERFACES
 // ===============================
 
-// 1. Простой дженерик
+// 1. Simple generic
 type SimpleRepo[T any] interface {
 	Get(id string) T   // want "method \"Get\" of interface \"SimpleRepo\" is declared but not used"
 	Save(item T) error // want "method \"Save\" of interface \"SimpleRepo\" is declared but not used"
 }
 
-// 2. Дженерик с ограничениями
+// 2. Generic with constraints
 type Comparable interface {
 	Compare(other Comparable) int // want "method \"Compare\" of interface \"Comparable\" is declared but not used"
 }
@@ -21,7 +21,7 @@ type SortableRepo[T Comparable] interface {
 	Remove(item T) bool  // want "method \"Remove\" of interface \"SortableRepo\" is declared but not used"
 }
 
-// 3. Множественные параметры типа
+// 3. Multiple type parameters
 type Cache[K comparable, V any] interface {
 	Get(key K) (V, bool) // want "method \"Get\" of interface \"Cache\" is declared but not used"
 	Set(key K, value V)  // want "method \"Set\" of interface \"Cache\" is declared but not used"
@@ -30,7 +30,7 @@ type Cache[K comparable, V any] interface {
 	Values() []V         // want "method \"Values\" of interface \"Cache\" is declared but not used"
 }
 
-// 4. Сложные ограничения
+// 4. Complex constraints
 type Serializable interface {
 	Serialize() []byte        // want "method \"Serialize\" of interface \"Serializable\" is declared but not used"
 	Deserialize([]byte) error // want "method \"Deserialize\" of interface \"Serializable\" is declared but not used"
@@ -43,7 +43,7 @@ type PersistentCache[K comparable, V Serializable] interface {
 	Restore() error             // want "method \"Restore\" of interface \"PersistentCache\" is declared but not used"
 }
 
-// 5. Вложенные дженерики
+// 5. Nested generics
 type NestedRepo[T any] interface {
 	GetMap() map[string]T                         // want "method \"GetMap\" of interface \"NestedRepo\" is declared but not used"
 	GetSlice() []T                                // want "method \"GetSlice\" of interface \"NestedRepo\" is declared but not used"
@@ -51,37 +51,37 @@ type NestedRepo[T any] interface {
 	ProcessBatch(items []T) (map[string]T, error) // want "method \"ProcessBatch\" of interface \"NestedRepo\" is declared but not used"
 }
 
-// 6. Дженерик-интерфейс из doc/GENERICS_PROBLEM.md
+// 6. Generic interface
 type GenericRepository[T any] interface {
-	Get(id string) (T, error) // используется (в GetUser и ListPosts)
-	Save(item T) error        // используется (в SaveUser)
+	Get(id string) (T, error) // used (in GetUser and ListPosts)
+	Save(item T) error        // used (in SaveUser)
 	Delete(id string) error   // want "method \"Delete\" of interface \"GenericRepository\" is declared but not used"
-	List() ([]T, error)       // используется (в ListPosts)
+	List() ([]T, error)       // used (in ListPosts)
 }
 
-// 7. Простой дженерик для тестирования
+// 7. Simple generic for testing
 type Repository[T any] interface {
-	Get(id string) (T, error) // используется (в GetUser)
+	Get(id string) (T, error) // used (in GetUser)
 	Save(item T) error        // want "method \"Save\" of interface \"Repository\" is declared but not used"
 	Delete(id string) error   // want "method \"Delete\" of interface \"Repository\" is declared but not used"
-	List() ([]T, error)       // используется (в ListPosts)
+	List() ([]T, error)       // used (in ListPosts)
 }
 
 // ===============================
-// ОБЫЧНЫЙ ИНТЕРФЕЙС ДЛЯ СРАВНЕНИЯ
+// REGULAR INTERFACE FOR COMPARISON
 // ===============================
 
-// Обычный интерфейс для сравнения с дженериками
+// Regular interface for comparison with generics
 type RegularInterface interface {
-	DoSomething() error // используется (в Work)
+	DoSomething() error // used (in Work)
 	GetResult() string  // want "method \"GetResult\" of interface \"RegularInterface\" is declared but not used"
 }
 
 // ===============================
-// ИСПОЛЬЗОВАНИЕ
+// USAGE
 // ===============================
 
-// Конкретные типы
+// Concrete types
 type User struct {
 	ID   string
 	Name string
@@ -92,7 +92,7 @@ type Post struct {
 	Title string
 }
 
-// Использование дженериков
+// Using generics
 type UserService struct {
 	userRepo GenericRepository[User]
 	repo     Repository[User]
@@ -103,47 +103,47 @@ type PostService struct {
 	repo     Repository[Post]
 }
 
-// Использование обычного интерфейса
+// Using regular interface
 type Service struct {
 	regular RegularInterface
 }
 
 func (s *Service) Work() {
-	s.regular.DoSomething() // Этот метод используется
-	// GetResult() НЕ используется
+	s.regular.DoSomething() // This method is used
+	// GetResult() is NOT used
 }
 
-// Использование дженерик-методов
+// Using generic methods
 func (us *UserService) GetUser(id string) (*User, error) {
-	// Вызов на GenericRepository[User]
+	// Call on GenericRepository[User]
 	user, err := us.userRepo.Get(id)
 	if err != nil {
 		return nil, err
 	}
 
-	// Вызов на Repository[User]
+	// Call on Repository[User]
 	us.repo.Get(id)
 
 	return &user, nil
 }
 
 func (us *UserService) SaveUser(user User) error {
-	// Вызов Save на GenericRepository[User]
+	// Call Save on GenericRepository[User]
 	return us.userRepo.Save(user)
 }
 
 func (ps *PostService) ListPosts() ([]Post, error) {
-	// Вызов List на GenericRepository[Post]
+	// Call List on GenericRepository[Post]
 	posts, err := ps.postRepo.List()
 	if err != nil {
 		return nil, err
 	}
 
-	// Вызов на Repository[Post]
+	// Call on Repository[Post]
 	ps.repo.List()
 
 	return posts, nil
 }
 
-// Delete НЕ используется ни в одном инстанцировании
-// Save в Repository[T] НЕ используется
+// Delete is NOT used in any instantiation
+// Save in Repository[T] is NOT used
