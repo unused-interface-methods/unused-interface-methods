@@ -55,7 +55,7 @@
 			<div id="nav">
 				<select id="files">
 				
-				<option value="file0">github.com/unused-interface-methods/unused-interface-methods/main.go (92.4%)</option>
+				<option value="file0">github.com/unused-interface-methods/unused-interface-methods/main.go (91.9%)</option>
 				
 				</select>
 			</div>
@@ -81,6 +81,7 @@
 		<pre class="file" id="file0" style="display: none">package main
 
 import (
+        "fmt"
         "go/ast"
         "go/token"
         "go/types"
@@ -362,13 +363,13 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
                 }</span>
         }
 
-        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="353">{
+        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="345">{
                 posI := pass.Fset.Position(unused[i].method.Pos())
                 posJ := pass.Fset.Position(unused[j].method.Pos())
-                if posI.Filename != posJ.Filename </span><span class="cov5" title="117">{
+                if posI.Filename != posJ.Filename </span><span class="cov5" title="90">{
                         return posI.Filename &lt; posJ.Filename
                 }</span>
-                <span class="cov6" title="236">return posI.Line &lt; posJ.Line</span>
+                <span class="cov6" title="255">return posI.Line &lt; posJ.Line</span>
         })
 
         <span class="cov1" title="1">for _, info := range unused </span><span class="cov4" title="59">{
@@ -377,8 +378,19 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
 }
 
 func run(pass *analysis.Pass) (interface{}, error) <span class="cov1" title="1">{
+        // Debug logging
+        fmt.Printf("Package: %s\n", pass.Pkg.Path())
+        if pass.Module != nil </span><span class="cov1" title="1">{
+                fmt.Printf("Module: %s (Path: %s, Version: %s)\n",
+                        pass.Module.Path,
+                        pass.Pkg.Path(),
+                        pass.Module.Version)
+        }</span> else<span class="cov0" title="0"> {
+                fmt.Printf("Module is nil for package: %s\n", pass.Pkg.Path())
+        }</span>
+
         // Skip packages not from the current module
-        if pass.Module == nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if pass.Module == nil </span><span class="cov0" title="0">{
                 // This could be standard library or external dependency
                 return nil, nil
         }</span>
