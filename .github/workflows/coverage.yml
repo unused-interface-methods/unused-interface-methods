@@ -1,0 +1,70 @@
+name: Coverage Badge
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Update coverage badge
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22.1'
+          cache: true
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git config --global --add safe.directory $GITHUB_WORKSPACE
+
+      - name: Run tests and generate coverage
+        run: |
+          mkdir -p .coverage
+          go test -covermode=count -coverprofile=.coverage/.out -coverpkg=./... ./...
+          go tool cover -func=.coverage/.out -o=.coverage/.txt
+          go tool cover -html=.coverage/.out -o=.coverage/.html
+
+      - name: Go Coverage Badge
+        uses: tj-actions/coverage-badge-go@v2
+        with:
+          filename: .coverage/.txt
+          text: coverage
+          link: https://htmlpreview.github.io/?https://github.com/${{ github.repository }}/blob/main/.coverage/.html
+
+      - name: Verify Changed files
+        uses: tj-actions/verify-changed-files@v16
+        id: verify-changed-files
+        with:
+          files: |
+            README.md
+            .coverage/.out
+
+      - name: Commit changes
+        if: steps.verify-changed-files.outputs.files_changed == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add README.md .coverage/.out .coverage/.txt .coverage/.html
+          git commit -m "chore: Updated coverage files"
+
+      - name: Push changes
+        if: steps.verify-changed-files.outputs.files_changed == 'true'
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ github.token }}
+          branch: ${{ github.head_ref }}
