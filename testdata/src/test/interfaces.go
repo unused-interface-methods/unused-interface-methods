@@ -517,7 +517,6 @@ func (g *GreeterImpl) Speak()        {}
 
 type Robot struct {
 	Greeter // used
-	Speaker // TODO: not used
 }
 
 // For Case 27
