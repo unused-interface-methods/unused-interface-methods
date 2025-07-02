@@ -55,7 +55,7 @@
 			<div id="nav">
 				<select id="files">
 				
-				<option value="file0">github.com/unused-interface-methods/unused-interface-methods/main.go (91.9%)</option>
+				<option value="file0">github.com/unused-interface-methods/unused-interface-methods/main.go (92.1%)</option>
 				
 				</select>
 			</div>
@@ -85,6 +85,7 @@ import (
         "go/ast"
         "go/token"
         "go/types"
+        "os"
         "sort"
         "strings"
 
@@ -96,8 +97,8 @@ import (
 
 // Analyzer implements plugins for finding unused interface methods.
 var Analyzer = &amp;analysis.Analyzer{
-        Name:     "unusedintf",
-        Doc:      "finds interface methods that are declared but not used in the code",
+        Name:     "unused_interface_methods",
+        Doc:      "Checks for unused interface methods",
         Requires: []*analysis.Analyzer{inspect.Analyzer},
         Run:      run,
 }
@@ -363,13 +364,13 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
                 }</span>
         }
 
-        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="345">{
+        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="356">{
                 posI := pass.Fset.Position(unused[i].method.Pos())
                 posJ := pass.Fset.Position(unused[j].method.Pos())
-                if posI.Filename != posJ.Filename </span><span class="cov5" title="90">{
+                if posI.Filename != posJ.Filename </span><span class="cov5" title="118">{
                         return posI.Filename &lt; posJ.Filename
                 }</span>
-                <span class="cov6" title="255">return posI.Line &lt; posJ.Line</span>
+                <span class="cov6" title="238">return posI.Line &lt; posJ.Line</span>
         })
 
         <span class="cov1" title="1">for _, info := range unused </span><span class="cov4" title="59">{
@@ -378,30 +379,30 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
 }
 
 func run(pass *analysis.Pass) (interface{}, error) <span class="cov1" title="1">{
-        // Debug logging
-        fmt.Printf("Package: %s\n", pass.Pkg.Path())
+        // Detailed debug logging
+        fmt.Fprintf(os.Stderr, "=== Analysis Start ===\n")
+        fmt.Fprintf(os.Stderr, "Package: %s\n", pass.Pkg.Path())
+        fmt.Fprintf(os.Stderr, "Package Imports Count: %v\n", len(pass.Pkg.Imports()))
+
         if pass.Module != nil </span><span class="cov1" title="1">{
-                fmt.Printf("Module: %s (Path: %s, Version: %s)\n",
-                        pass.Module.Path,
-                        pass.Pkg.Path(),
-                        pass.Module.Version)
+                fmt.Fprintf(os.Stderr, "Module Info:\n")
+                fmt.Fprintf(os.Stderr, "  - Path: %s\n", pass.Module.Path)
+                fmt.Fprintf(os.Stderr, "  - Version: %s\n", pass.Module.Version)
         }</span> else<span class="cov0" title="0"> {
-                fmt.Printf("Module is nil for package: %s\n", pass.Pkg.Path())
+                fmt.Fprintf(os.Stderr, "No module info available\n")
         }</span>
 
-        // Skip packages not from the current module
-        <span class="cov1" title="1">if pass.Module == nil </span><span class="cov0" title="0">{
-                // This could be standard library or external dependency
+        // Check if this is an external dependency
+        <span class="cov1" title="1">if strings.Contains(pass.Pkg.Path(), "github.com/zelenin/go-tdlib") ||
+                strings.Contains(pass.Pkg.Path(), "github.com/comerc/go-tdlib") </span><span class="cov0" title="0">{
+                fmt.Fprintf(os.Stderr, "Skipping tdlib dependency: %s\n", pass.Pkg.Path())
                 return nil, nil
         }</span>
 
-        // Skip if package path doesn't belong to current module
-        <span class="cov1" title="1">if !strings.HasPrefix(pass.Pkg.Path(), pass.Module.Path) </span><span class="cov0" title="0">{
-                return nil, nil
-        }</span>
+        <span class="cov1" title="1">fmt.Fprintf(os.Stderr, "=== Starting Analysis ===\n")
 
-        // Continue with the analysis for packages from the current module
-        <span class="cov1" title="1">ifaceMethods := collectInterfaceMethods(pass)
+        // Continue with normal analysis
+        ifaceMethods := collectInterfaceMethods(pass)
         used := analyzeUsedMethods(pass, ifaceMethods)
         reportUnusedMethods(pass, ifaceMethods, used)
 
