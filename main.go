@@ -5,7 +5,6 @@ import (
 	"go/token"
 	"go/types"
 	"sort"
-	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -297,22 +296,9 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
 }
 
 func run(pass *analysis.Pass) (interface{}, error) {
-	// Filter out test files
-	files := make([]*ast.File, 0, len(pass.Files))
-	for _, file := range pass.Files {
-		if !strings.HasSuffix(pass.Fset.Position(file.Pos()).Filename, "_test.go") {
-			files = append(files, file)
-		}
-	}
-
-	// Use filtered files
-	pass.Files = files
-
-	// Continue with normal analysis
 	ifaceMethods := collectInterfaceMethods(pass)
 	used := analyzeUsedMethods(pass, ifaceMethods)
 	reportUnusedMethods(pass, ifaceMethods, used)
-
 	return nil, nil
 }
 
