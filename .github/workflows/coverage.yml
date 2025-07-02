@@ -55,8 +55,6 @@ jobs:
       - name: Commit changes
         if: steps.verify-changed-files.outputs.files_changed == 'true'
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
           git add README.md .coverage/.out .coverage/.txt .coverage/.html
           git commit -m "chore: Updated coverage files"
 
