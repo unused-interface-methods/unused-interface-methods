@@ -79,9 +79,9 @@ github.com/unused-interface-methods/unused-interface-methods/main.go:276.2,277.3
 github.com/unused-interface-methods/unused-interface-methods/main.go:277.36,278.17 1 122
 github.com/unused-interface-methods/unused-interface-methods/main.go:278.17,280.4 1 59
 github.com/unused-interface-methods/unused-interface-methods/main.go:283.2,283.41 1 1
-github.com/unused-interface-methods/unused-interface-methods/main.go:283.41,286.37 3 329
-github.com/unused-interface-methods/unused-interface-methods/main.go:286.37,288.4 1 80
-github.com/unused-interface-methods/unused-interface-methods/main.go:289.3,289.31 1 249
+github.com/unused-interface-methods/unused-interface-methods/main.go:283.41,286.37 3 353
+github.com/unused-interface-methods/unused-interface-methods/main.go:286.37,288.4 1 91
+github.com/unused-interface-methods/unused-interface-methods/main.go:289.3,289.31 1 262
 github.com/unused-interface-methods/unused-interface-methods/main.go:292.2,292.30 1 1
 github.com/unused-interface-methods/unused-interface-methods/main.go:292.30,294.3 1 59
 github.com/unused-interface-methods/unused-interface-methods/main.go:297.52,302.2 4 1
