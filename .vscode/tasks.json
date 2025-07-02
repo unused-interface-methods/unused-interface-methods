@@ -6,13 +6,13 @@
       "type": "shell",
       "command": "${command:go.buildTags}",
       "windows": {
-        "command": "./unused-interface-methods.exe"
+        "command": "unused-interface-methods"
       },
       "linux": {
-        "command": "./unused-interface-methods"
+        "command": "unused-interface-methods"
       },
       "osx": {
-        "command": "./unused-interface-methods"
+        "command": "unused-interface-methods"
       },
       "args": [
         "./..."

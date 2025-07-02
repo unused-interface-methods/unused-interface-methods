@@ -31,16 +31,12 @@
 - 🔌 **Editor Integration**: Works with `go vet`, `gopls`, and your favorite IDE
 - 🌍 **Cross-Platform**: Full support for Windows, Linux, and macOS
 
+
 ## 🚀 Quick Start
 
 ```bash
-# Install golangci-lint
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-
-# Clone and build
-git clone https://github.com/unused-interface-methods/unused-interface-methods.git
-cd unused-interface-methods
-make build
+# Install the tool globally
+go install github.com/unused-interface-methods/unused-interface-methods@latest
 ```
 
 ## 🔧 VS Code Integration
@@ -84,6 +80,18 @@ analyzers := []*analysis.Analyzer{
 - 🤖 **Code Generation**: Dynamic/generated code is not analyzed
 - 🔌 **Plugins**: Runtime plugin loading is not tracked
 - 🧪 **Generics**: Best-effort matching; edge cases may slip through
+
+## 🔨 Development
+
+```bash
+# Install golangci-lint
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+# Clone and build
+git clone https://github.com/unused-interface-methods/unused-interface-methods.git
+cd unused-interface-methods
+make build
+```
 
 ## 🤝 Contributing
 
