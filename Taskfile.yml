@@ -1,0 +1,57 @@
+version: "3"
+
+vars:
+  BINARY_NAME:
+    sh: |
+      if [[ "$OS" == "Windows_NT" ]] || [[ "$(uname -s)" == *"MINGW"* ]] || [[ "$(uname -s)" == *"CYGWIN"* ]]; then
+        echo "unused-interface-methods.exe"
+      else
+        echo "unused-interface-methods"
+      fi
+
+tasks:
+  lint:
+    desc: "run golangci-lint"
+    cmds:
+      - golangci-lint run .
+
+  build:
+    desc: "build unused-interface-methods linter"
+    cmds:
+      - go build -o {{.BINARY_NAME}} .
+
+  test:
+    desc: "run tests"
+    cmds:
+      - go test -v
+
+  bench:
+    desc: "run benchmarks"
+    cmds:
+      - go test -bench=.
+
+  clean:
+    desc: "clean build artifacts"
+    cmds:
+      - |
+        if [[ "$OS" == "Windows_NT" ]] || [[ "$(uname -s)" == *"MINGW"* ]] || [[ "$(uname -s)" == *"CYGWIN"* ]]; then
+          del /f /q {{.BINARY_NAME}} 2>nul || true
+        else
+          rm -f {{.BINARY_NAME}}
+        fi
+
+  try:
+    desc: "run unused-interface-methods linter"
+    deps: [build]
+    cmds:
+      - |
+        if [[ "$OS" == "Windows_NT" ]] || [[ "$(uname -s)" == *"MINGW"* ]] || [[ "$(uname -s)" == *"CYGWIN"* ]]; then
+          ./{{.BINARY_NAME}} ./...
+        else
+          ./{{.BINARY_NAME}} ./...
+        fi
+
+  default:
+    desc: "show available tasks"
+    cmds:
+      - task --list
