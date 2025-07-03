@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"go/types"
 	"sort"
+	"sync"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -28,49 +29,64 @@ type methodInfo struct {
 	used      bool             // used flag
 }
 
-// collectInterfaceMethods collects all explicit interface methods in the package.
+// collectInterfaceMethods collects all explicit interface methods in the package using parallel processing.
 func collectInterfaceMethods(pass *analysis.Pass) map[*types.Func]methodInfo {
-	ifaceMethods := map[*types.Func]methodInfo{}
+	var ifaceMethods sync.Map
+	var wg sync.WaitGroup
+
 	for _, file := range pass.Files {
-		for _, decl := range file.Decls {
-			gd, ok := decl.(*ast.GenDecl)
-			if !ok || gd.Tok != token.TYPE {
-				continue
-			}
-			for _, spec := range gd.Specs {
-				tspec := spec.(*ast.TypeSpec)
-				if _, ok := tspec.Type.(*ast.InterfaceType); !ok {
+		wg.Add(1)
+		go func(file *ast.File) {
+			defer wg.Done()
+
+			for _, decl := range file.Decls {
+				gd, ok := decl.(*ast.GenDecl)
+				if !ok || gd.Tok != token.TYPE {
 					continue
 				}
-				obj := pass.TypesInfo.Defs[tspec.Name]
-				if obj == nil {
-					continue
-				}
-				named, ok := obj.Type().(*types.Named)
-				if !ok {
-					continue
-				}
-				ifaceType, ok := named.Underlying().(*types.Interface)
-				if !ok {
-					continue
-				}
-				for i := 0; i < ifaceType.NumExplicitMethods(); i++ {
-					m := ifaceType.ExplicitMethod(i)
-					if m == nil {
+				for _, spec := range gd.Specs {
+					tspec := spec.(*ast.TypeSpec)
+					if _, ok := tspec.Type.(*ast.InterfaceType); !ok {
 						continue
 					}
-					ifaceMethods[m] = methodInfo{
-						ifaceName: tspec.Name.Name,
-						iface:     ifaceType,
-						method:    m,
-						used:      false,
+					obj := pass.TypesInfo.Defs[tspec.Name]
+					if obj == nil {
+						continue
+					}
+					named, ok := obj.Type().(*types.Named)
+					if !ok {
+						continue
+					}
+					ifaceType, ok := named.Underlying().(*types.Interface)
+					if !ok {
+						continue
+					}
+					for i := 0; i < ifaceType.NumExplicitMethods(); i++ {
+						m := ifaceType.ExplicitMethod(i)
+						if m == nil {
+							continue
+						}
+						ifaceMethods.Store(m, methodInfo{
+							ifaceName: tspec.Name.Name,
+							iface:     ifaceType,
+							method:    m,
+							used:      false,
+						})
 					}
 				}
 			}
-		}
+		}(file)
 	}
 
-	return ifaceMethods
+	wg.Wait()
+
+	// convert sync.Map to regular map
+	result := make(map[*types.Func]methodInfo)
+	ifaceMethods.Range(func(key, value interface{}) bool {
+		result[key.(*types.Func)] = value.(methodInfo)
+		return true
+	})
+	return result
 }
 
 // methodAnalyzer handles analysis of method usage in AST
@@ -78,14 +94,23 @@ type methodAnalyzer struct {
 	pass         *analysis.Pass
 	ifaceMethods map[*types.Func]methodInfo
 	usedMethods  map[*types.Func]bool
+	methodIndex  map[string][]*types.Func // index methods by name for faster lookup
 }
 
 // newMethodAnalyzer creates a new method analyzer
 func newMethodAnalyzer(pass *analysis.Pass, ifaceMethods map[*types.Func]methodInfo) *methodAnalyzer {
+	// build method index by name
+	methodIndex := make(map[string][]*types.Func)
+	for method := range ifaceMethods {
+		name := method.Name()
+		methodIndex[name] = append(methodIndex[name], method)
+	}
+
 	return &methodAnalyzer{
 		pass:         pass,
 		ifaceMethods: ifaceMethods,
 		usedMethods:  make(map[*types.Func]bool),
+		methodIndex:  methodIndex,
 	}
 }
 
@@ -131,11 +156,15 @@ func (ma *methodAnalyzer) analyzeSelectorExpr(node *ast.SelectorExpr) {
 
 // markMatchingMethods marks interface methods that match the called method
 func (ma *methodAnalyzer) markMatchingMethods(calledMethod *types.Func, recv types.Type) {
-	for ifaceMethod, info := range ma.ifaceMethods {
+	// only check methods with matching names using index
+	candidateMethods := ma.methodIndex[calledMethod.Name()]
+
+	for _, ifaceMethod := range candidateMethods {
 		if ma.usedMethods[ifaceMethod] {
 			continue
 		}
 
+		info := ma.ifaceMethods[ifaceMethod]
 		if ma.isMethodMatch(calledMethod, ifaceMethod, recv, info) {
 			ma.usedMethods[ifaceMethod] = true
 		}
@@ -238,11 +267,15 @@ func (ma *methodAnalyzer) analyzeFmtCall(node *ast.CallExpr) {
 
 // checkStringerUsage checks if argument implements Stringer interface
 func (ma *methodAnalyzer) checkStringerUsage(argType types.Type) {
-	for ifaceMethod, info := range ma.ifaceMethods {
+	// only check methods named "String" using index
+	stringMethods := ma.methodIndex["String"]
+
+	for _, ifaceMethod := range stringMethods {
 		if ma.usedMethods[ifaceMethod] {
 			continue
 		}
 
+		info := ma.ifaceMethods[ifaceMethod]
 		if ma.isStringerMethod(ifaceMethod) && types.Implements(argType, info.iface) {
 			ma.usedMethods[ifaceMethod] = true
 		}
