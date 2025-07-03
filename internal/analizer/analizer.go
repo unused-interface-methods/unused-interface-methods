@@ -15,7 +15,7 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-// a implements plugins for finding unused interface methods.
+// a implements plugin for finding unused interface methods.
 var a = &analysis.Analyzer{
 	Name:     "unused_interface_methods",
 	Doc:      "Checks for unused interface methods",
