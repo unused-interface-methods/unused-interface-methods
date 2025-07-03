@@ -57,7 +57,23 @@ func (o *SomeObject) SomeMethod() {
 ```bash
 # Install the tool globally
 go install github.com/unused-interface-methods/unused-interface-methods@latest
+
+unused-interface-methods ./...
 ```
+
+## ⚙️ Configuration
+
+```yaml
+# unused-interface-methods.yml
+ignore:
+  - "**/*_test.go"
+  - "test/**"
+  - "**/*_mock.go"
+  - "**/mock/**"
+  - "**/mocks/**"
+```
+
+The configuration file is automatically searched in the current directory (or `.config/`) with an optional dot prefix.
 
 ## 🔧 VS Code Integration
 
