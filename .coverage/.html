@@ -3,7 +3,7 @@
 <html>
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-		<title>unused-interface-methods: Go Coverage Report</title>
+		<title>analizer: Go Coverage Report</title>
 		<style>
 			body {
 				background: black;
@@ -55,7 +55,13 @@
 			<div id="nav">
 				<select id="files">
 				
-				<option value="file0">github.com/unused-interface-methods/unused-interface-methods/main.go (93.9%)</option>
+				<option value="file0">github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go (91.9%)</option>
+				
+				<option value="file1">github.com/unused-interface-methods/unused-interface-methods/internal/analizer/init.go (73.3%)</option>
+				
+				<option value="file2">github.com/unused-interface-methods/unused-interface-methods/internal/config/config.go (93.3%)</option>
+				
+				<option value="file3">github.com/unused-interface-methods/unused-interface-methods/main.go (0.0%)</option>
 				
 				</select>
 			</div>
@@ -78,12 +84,15 @@
 		</div>
 		<div id="content">
 		
-		<pre class="file" id="file0" style="display: none">package main
+		<pre class="file" id="file0" style="display: none">package analizer
 
 import (
+        "fmt"
         "go/ast"
         "go/token"
         "go/types"
+        "os"
+        "path/filepath"
         "sort"
 
         "golang.org/x/tools/go/analysis"
@@ -92,8 +101,8 @@ import (
         "golang.org/x/tools/go/ast/inspector"
 )
 
-// Analyzer implements plugins for finding unused interface methods.
-var Analyzer = &amp;analysis.Analyzer{
+// a implements plugins for finding unused interface methods.
+var a = &amp;analysis.Analyzer{
         Name:     "unused_interface_methods",
         Doc:      "Checks for unused interface methods",
         Requires: []*analysis.Analyzer{inspect.Analyzer},
@@ -111,8 +120,22 @@ type methodInfo struct {
 // collectInterfaceMethods collects all explicit interface methods in the package.
 func collectInterfaceMethods(pass *analysis.Pass) map[*types.Func]methodInfo <span class="cov1" title="1">{
         ifaceMethods := map[*types.Func]methodInfo{}
+
         for _, file := range pass.Files </span><span class="cov2" title="3">{
-                for _, decl := range file.Decls </span><span class="cov5" title="122">{
+                filename := pass.Fset.Position(file.Pos()).Filename
+                relPath, err := filepath.Rel(basePath, filename)
+                if err != nil </span><span class="cov0" title="0">{
+                        relPath = filename
+                }</span>
+
+                // Skip test files
+                <span class="cov2" title="3">fmt.Fprintf(os.Stderr, "[DEBUG] File: %s\n", relPath)
+                if cfg.ShouldIgnore(relPath) </span><span class="cov0" title="0">{
+                        fmt.Fprintf(os.Stderr, "[DEBUG] Skipping file: %s\n", relPath)
+                        continue</span>
+                }
+
+                <span class="cov2" title="3">for _, decl := range file.Decls </span><span class="cov5" title="122">{
                         gd, ok := decl.(*ast.GenDecl)
                         if !ok || gd.Tok != token.TYPE </span><span class="cov4" title="49">{
                                 continue</span>
@@ -171,8 +194,8 @@ func newMethodAnalyzer(pass *analysis.Pass, ifaceMethods map[*types.Func]methodI
 
 // analyzeUsedMethods traverses AST and marks used methods
 func analyzeUsedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]methodInfo) map[*types.Func]bool <span class="cov1" title="1">{
-        analyzer := newMethodAnalyzer(pass, ifaceMethods)
-        return analyzer.analyze()
+        methodAnalyzer := newMethodAnalyzer(pass, ifaceMethods)
+        return methodAnalyzer.analyze()
 }</span>
 
 // analyze performs the main analysis logic
@@ -361,13 +384,13 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
                 }</span>
         }
 
-        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="340">{
+        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="339">{
                 posI := pass.Fset.Position(unused[i].method.Pos())
                 posJ := pass.Fset.Position(unused[j].method.Pos())
-                if posI.Filename != posJ.Filename </span><span class="cov5" title="98">{
+                if posI.Filename != posJ.Filename </span><span class="cov5" title="121">{
                         return posI.Filename &lt; posJ.Filename
                 }</span>
-                <span class="cov6" title="242">return posI.Line &lt; posJ.Line</span>
+                <span class="cov6" title="218">return posI.Line &lt; posJ.Line</span>
         })
 
         <span class="cov1" title="1">for _, info := range unused </span><span class="cov4" title="59">{
@@ -382,8 +405,168 @@ func run(pass *analysis.Pass) (interface{}, error) <span class="cov1" title="1">
         return nil, nil
 }</span>
 
+func Run() <span class="cov0" title="0">{
+        singlechecker.Main(a)
+}</span>
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package analizer
+
+import (
+        "fmt"
+        "os"
+        "path/filepath"
+        "strings"
+
+        "github.com/unused-interface-methods/unused-interface-methods/internal/config"
+)
+
+var (
+        basePath string
+        cfg      *config.Config
+)
+
+func init() <span class="cov8" title="1">{
+        var err error
+        basePath, err = extractBasePath(os.Args[1:])
+        if err != nil </span><span class="cov0" title="0">{
+                fmt.Fprintf(os.Stderr, "Error extracting base path: %v\n", err)
+                os.Exit(1)
+        }</span>
+        <span class="cov8" title="1">cfg, err = config.LoadConfig("")
+        if err != nil </span><span class="cov0" title="0">{
+                fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+                os.Exit(1)
+        }</span>
+}
+
+func extractBasePath(args []string) (string, error) <span class="cov8" title="1">{
+        result := "."
+        if len(args) &gt; 0 </span><span class="cov8" title="1">{
+                result = args[0]
+                result = strings.TrimSuffix(result, "/...")
+                result = strings.TrimPrefix(result, "./")
+        }</span>
+        <span class="cov8" title="1">return filepath.Abs(result)</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package config
+
+import (
+        "os"
+        "path/filepath"
+
+        "github.com/bmatcuk/doublestar/v4"
+        "gopkg.in/yaml.v3"
+)
+
+// Config contains linter settings
+type Config struct {
+        // Patterns for ignoring files and directories
+        Ignore []string `yaml:"ignore"`
+}
+
+// defaultConfig returns the default configuration
+func defaultConfig() *Config <span class="cov6" title="7">{
+        return &amp;Config{
+                Ignore: []string{
+                        "**/*_test.go",
+                        "test/**",
+                        "**/*_mock.go",
+                        "**/mock/**",
+                        "**/mocks/**",
+                },
+        }
+}</span>
+
+// findConfigFile searches for a configuration file in standard locations
+func findConfigFile() string <span class="cov4" title="4">{
+        candidates := []string{
+                ".unused-interface-methods.yml",
+                "unused-interface-methods.yml",
+                ".config/unused-interface-methods.yml",
+                ".unused-interface-methods.yaml",
+                "unused-interface-methods.yaml",
+                ".config/unused-interface-methods.yaml",
+        }
+
+        for _, candidate := range candidates </span><span class="cov7" title="14">{
+                if _, err := os.Stat(candidate); err == nil </span><span class="cov2" title="2">{
+                        return candidate
+                }</span>
+        }
+
+        <span class="cov2" title="2">return ""</span>
+}
+
+// matchPattern checks if a file matches the pattern
+func (c *Config) matchPattern(pattern, filePath string) bool <span class="cov10" title="32">{
+        // Normalize path
+        filePath = filepath.Clean(filePath)
+
+        // Use doublestar for pattern matching
+        matched, _ := doublestar.Match(pattern, filePath)
+        return matched
+}</span>
+
+// ShouldIgnore checks if a file or directory should be ignored
+func (c *Config) ShouldIgnore(filePath string) bool <span class="cov6" title="9">{
+        // Normalize path
+        filePath = filepath.Clean(filePath)
+
+        for _, pattern := range c.Ignore </span><span class="cov10" title="32">{
+                if c.matchPattern(pattern, filePath) </span><span class="cov4" title="4">{
+                        return true
+                }</span>
+        }
+
+        <span class="cov5" title="5">return false</span>
+}
+
+// LoadConfig loads configuration from a file or returns default configuration
+func LoadConfig(configPath string) (*Config, error) <span class="cov5" title="6">{
+        // If path is not specified, look in standard locations
+        if configPath == "" </span><span class="cov4" title="4">{
+                configPath = findConfigFile()
+        }</span>
+
+        // If file is not found, use default configuration
+        <span class="cov5" title="6">if configPath == "" </span><span class="cov2" title="2">{
+                return defaultConfig(), nil
+        }</span>
+
+        // Check if file exists
+        <span class="cov4" title="4">_, err := os.Stat(configPath)
+        if err != nil </span><span class="cov1" title="1">{
+                if os.IsNotExist(err) </span><span class="cov0" title="0">{
+                        return defaultConfig(), nil
+                }</span>
+                <span class="cov1" title="1">return nil, err</span>
+        }
+
+        <span class="cov3" title="3">data, err := os.ReadFile(configPath)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov3" title="3">config := defaultConfig()
+        if err := yaml.Unmarshal(data, config); err != nil </span><span class="cov1" title="1">{
+                return nil, err
+        }</span>
+
+        <span class="cov2" title="2">return config, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package main
+
+import (
+        "github.com/unused-interface-methods/unused-interface-methods/internal/analizer"
+)
+
 func main() <span class="cov0" title="0">{
-        singlechecker.Main(Analyzer)
+        analizer.Run()
 }</span>
 </pre>
 		
