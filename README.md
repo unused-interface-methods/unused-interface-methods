@@ -138,3 +138,6 @@ We ❤️ contributions! Please include:
 3. 🔖 **Go version** (`go version`)
 
 **[⭐ Star this repo](https://github.com/unused-interface-methods/unused-interface-methods)** if it helped you write cleaner Go code!
+
+--- 
+
