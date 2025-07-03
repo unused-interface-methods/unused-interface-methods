@@ -3,7 +3,7 @@
   "tasks": [
     {
       "label": "Go: Check Unused Interface Methods",
-      "type": "shell",
+      // "type": "shell",
       "command": "${command:go.buildTags}",
       "windows": {
         "command": "unused-interface-methods.exe"
@@ -14,9 +14,7 @@
       "osx": {
         "command": "unused-interface-methods"
       },
-      "args": [
-        "./..."
-      ],
+      "args": ["./..."],
       "group": {
         "kind": "build",
         "isDefault": false
@@ -39,7 +37,7 @@
           "column": 3,
           "message": 4
         }
-      },
-    },
+      }
+    }
   ]
 }

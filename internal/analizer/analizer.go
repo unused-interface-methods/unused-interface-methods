@@ -347,31 +347,6 @@ func (ma *methodAnalyzer) genericMethodsMatch(instMethod, genericMethod *types.F
 	return true // If names match and we got here, consider it a match
 }
 
-// interfacesHaveIdenticalMethods checks if two interfaces have exactly the same methods
-func interfacesHaveIdenticalMethods(a, b *types.Interface) bool {
-	if a.NumMethods() != b.NumMethods() {
-		return false
-	}
-
-	// Check each method in a has a corresponding method in b
-	for i := 0; i < a.NumMethods(); i++ {
-		aMethod := a.Method(i)
-		found := false
-		for j := 0; j < b.NumMethods(); j++ {
-			bMethod := b.Method(j)
-			if aMethod.Name() == bMethod.Name() && types.Identical(aMethod.Type(), bMethod.Type()) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return false
-		}
-	}
-
-	return true
-}
-
 // analyzeCallExpr handles function calls (specifically fmt.* functions)
 func (ma *methodAnalyzer) analyzeCallExpr(node *ast.CallExpr) {
 	ident := ma.extractFunctionIdent(node)
