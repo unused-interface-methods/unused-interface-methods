@@ -10,12 +10,17 @@ import (
 )
 
 var (
+	verbose  bool
 	basePath string
 	cfg      *config.Config
 )
 
 func init() {
 	var err error
+	val := os.Getenv("UNUSED_INTERFACE_METHODS_VERBOSE")
+	if val == "1" || val == "true" {
+		verbose = true
+	}
 	basePath, err = extractBasePath(os.Args[1:])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error extracting base path: %v\n", err)

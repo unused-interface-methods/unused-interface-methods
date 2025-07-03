@@ -42,10 +42,13 @@ func collectInterfaceMethods(pass *analysis.Pass) map[*types.Func]methodInfo {
 			relPath = filename
 		}
 
-		// Skip test files
-		fmt.Fprintf(os.Stderr, "[DEBUG] File: %s\n", relPath)
+		if verbose {
+			fmt.Fprintf(os.Stderr, "[DEBUG] File: %s\n", relPath)
+		}
 		if cfg.ShouldIgnore(relPath) {
-			fmt.Fprintf(os.Stderr, "[DEBUG] Skipping file: %s\n", relPath)
+			if verbose {
+				fmt.Fprintf(os.Stderr, "[DEBUG] Skipping file: %s\n", relPath)
+			}
 			continue
 		}
 
