@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 )
 
@@ -137,6 +138,11 @@ func TestLoadConfig(t *testing.T) {
 	})
 
 	t.Run("permission denied", func(t *testing.T) {
+		// Skip this test on Windows as permission handling is different
+		if runtime.GOOS == "windows" {
+			t.Skip("Skipping permission test on Windows")
+		}
+
 		// Change to temporary directory
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatal(err)
