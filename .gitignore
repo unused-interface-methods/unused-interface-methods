@@ -28,3 +28,4 @@ go.work.sum
 unused-interface-methods
 
 .coverage/.out
+.coverage/.tmp
