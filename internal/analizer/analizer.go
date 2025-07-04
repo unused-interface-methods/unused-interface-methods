@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -33,20 +32,18 @@ type methodInfo struct {
 	used      bool             // used flag
 }
 
-// pathCache caches relative paths to avoid repeated filepath.Rel calls
-var pathCache sync.Map
-
 // collectInterfaceMethods collects all explicit interface methods in the package.
 func collectInterfaceMethods(pass *analysis.Pass) map[*types.Func]methodInfo {
 	ifaceMethods := make(map[*types.Func]methodInfo, 32) // Pre-allocate with reasonable capacity
+	pathCache := make(map[string]string)                 // Local cache for this analysis run
 
 	for _, file := range pass.Files {
 		filename := pass.Fset.Position(file.Pos()).Filename
 
 		// Check path cache first
 		var relPath string
-		if cached, ok := pathCache.Load(filename); ok {
-			relPath = cached.(string)
+		if cached, ok := pathCache[filename]; ok {
+			relPath = cached
 		} else {
 			var err error
 			relPath, err = filepath.Rel(basePath, filename)
@@ -55,7 +52,7 @@ func collectInterfaceMethods(pass *analysis.Pass) map[*types.Func]methodInfo {
 			}
 			// Normalize path separators for consistency
 			relPath = strings.ReplaceAll(relPath, "\\", "/")
-			pathCache.Store(filename, relPath)
+			pathCache[filename] = relPath
 		}
 
 		if cfg.ShouldIgnore(relPath) {
@@ -122,22 +119,32 @@ type methodAnalyzer struct {
 
 // newMethodAnalyzer creates a new method analyzer
 func newMethodAnalyzer(pass *analysis.Pass, ifaceMethods map[*types.Func]methodInfo) *methodAnalyzer {
-	ma := &methodAnalyzer{
+	return &methodAnalyzer{
 		pass:           pass,
 		ifaceMethods:   ifaceMethods,
-		usedMethods:    make(map[*types.Func]bool, len(ifaceMethods)),
-		varAssignments: make(map[string]string, 64),
-		concreteTypes:  make(map[string][]string, 32),
-		methodsByName:  make(map[string][]*types.Func, len(ifaceMethods)/2),
+		usedMethods:    make(map[*types.Func]bool),
+		varAssignments: make(map[string]string),
+		concreteTypes:  make(map[string][]string),
+		methodsByName:  make(map[string][]*types.Func),
+	}
+}
+
+// getMethodsByName returns methods with the given name, building cache lazily
+func (ma *methodAnalyzer) getMethodsByName(name string) []*types.Func {
+	if methods, cached := ma.methodsByName[name]; cached {
+		return methods
 	}
 
-	// Build method name index for faster lookups
-	for method := range ifaceMethods {
-		name := method.Name()
-		ma.methodsByName[name] = append(ma.methodsByName[name], method)
+	// Build cache entry for this name only
+	var methods []*types.Func
+	for method := range ma.ifaceMethods {
+		if method.Name() == name {
+			methods = append(methods, method)
+		}
 	}
 
-	return ma
+	ma.methodsByName[name] = methods
+	return methods
 }
 
 // analyzeUsedMethods traverses AST and marks used methods
@@ -260,8 +267,8 @@ func (ma *methodAnalyzer) analyzeSelectorExpr(node *ast.SelectorExpr) {
 	calledMethodName := calledMethod.Name()
 
 	// Check only methods with matching names to avoid unnecessary iteration
-	candidates, hasCandidates := ma.methodsByName[calledMethodName]
-	if !hasCandidates {
+	candidates := ma.getMethodsByName(calledMethodName)
+	if len(candidates) == 0 {
 		return
 	}
 
@@ -311,15 +318,10 @@ func (ma *methodAnalyzer) analyzeSelectorExpr(node *ast.SelectorExpr) {
 
 // markMatchingMethods marks interface methods that match the called method
 func (ma *methodAnalyzer) markMatchingMethods(calledMethod *types.Func, recv types.Type) {
-	// Early exit if all methods are already marked as used
-	if len(ma.usedMethods) == len(ma.ifaceMethods) {
-		return
-	}
-
 	// First, check only methods with matching names
 	calledName := calledMethod.Name()
-	candidates, hasCandidates := ma.methodsByName[calledName]
-	if !hasCandidates {
+	candidates := ma.getMethodsByName(calledName)
+	if len(candidates) == 0 {
 		return // No interface methods with this name
 	}
 
@@ -453,8 +455,8 @@ func (ma *methodAnalyzer) analyzeFmtCall(node *ast.CallExpr) {
 // checkStringerUsage checks if argument implements Stringer interface
 func (ma *methodAnalyzer) checkStringerUsage(argType types.Type) {
 	// Only check String() methods - use name index for faster lookup
-	stringMethods, hasStringMethods := ma.methodsByName["String"]
-	if !hasStringMethods {
+	stringMethods := ma.getMethodsByName("String")
+	if len(stringMethods) == 0 {
 		return
 	}
 
