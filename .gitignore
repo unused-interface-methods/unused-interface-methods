@@ -26,3 +26,5 @@ go.work.sum
 # .vscode/
 
 unused-interface-methods
+
+.coverage/.out
