@@ -153,7 +153,7 @@ type StringProcessor interface {
 }
 
 type StringHandler interface {
-	Process(data string) error // TODO: not used, but has the same signature
+	Process(data string) error // want "method \"Process\" of interface \"StringHandler\" is declared but not used"
 }
 
 type StringConsumer interface {
