@@ -49,8 +49,8 @@ func findConfigFile() string {
 
 // matchPattern checks if a file matches the pattern
 func (c *Config) matchPattern(pattern, filePath string) bool {
-	// Normalize path
-	filePath = filepath.Clean(filePath)
+	// Normalize path - convert backslashes to forward slashes for consistent matching
+	filePath = filepath.ToSlash(filepath.Clean(filePath))
 
 	// Use doublestar for pattern matching
 	matched, _ := doublestar.Match(pattern, filePath)
@@ -59,8 +59,8 @@ func (c *Config) matchPattern(pattern, filePath string) bool {
 
 // ShouldIgnore checks if a file or directory should be ignored
 func (c *Config) ShouldIgnore(filePath string) bool {
-	// Normalize path
-	filePath = filepath.Clean(filePath)
+	// Normalize path - convert backslashes to forward slashes for consistent matching
+	filePath = filepath.ToSlash(filepath.Clean(filePath))
 
 	for _, pattern := range c.Ignore {
 		if c.matchPattern(pattern, filePath) {
