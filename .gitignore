@@ -29,3 +29,5 @@ unused-interface-methods
 
 .coverage/.out
 .coverage/.tmp
+
+.DS_Store
