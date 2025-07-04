@@ -217,9 +217,9 @@ github.com/unused-interface-methods/unused-interface-methods/internal/analizer/a
 github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:298.36,299.17 1 122
 github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:299.17,301.4 1 59
 github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:304.2,304.41 1 1
-github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:304.41,307.37 3 327
-github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:307.37,309.4 1 106
-github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:310.3,310.31 1 221
+github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:304.41,307.37 3 336
+github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:307.37,309.4 1 96
+github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:310.3,310.31 1 240
 github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:313.2,313.30 1 1
 github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:313.30,315.3 1 59
 github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:318.52,323.2 4 1
