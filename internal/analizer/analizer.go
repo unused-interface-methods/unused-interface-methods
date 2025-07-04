@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
+	"sync"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -31,15 +33,29 @@ type methodInfo struct {
 	used      bool             // used flag
 }
 
+// pathCache caches relative paths to avoid repeated filepath.Rel calls
+var pathCache sync.Map
+
 // collectInterfaceMethods collects all explicit interface methods in the package.
 func collectInterfaceMethods(pass *analysis.Pass) map[*types.Func]methodInfo {
-	ifaceMethods := map[*types.Func]methodInfo{}
+	ifaceMethods := make(map[*types.Func]methodInfo, 32) // Pre-allocate with reasonable capacity
 
 	for _, file := range pass.Files {
 		filename := pass.Fset.Position(file.Pos()).Filename
-		relPath, err := filepath.Rel(basePath, filename)
-		if err != nil {
-			relPath = filename
+
+		// Check path cache first
+		var relPath string
+		if cached, ok := pathCache.Load(filename); ok {
+			relPath = cached.(string)
+		} else {
+			var err error
+			relPath, err = filepath.Rel(basePath, filename)
+			if err != nil {
+				relPath = filename
+			}
+			// Normalize path separators for consistency
+			relPath = strings.ReplaceAll(relPath, "\\", "/")
+			pathCache.Store(filename, relPath)
 		}
 
 		if verbose {
@@ -99,19 +115,29 @@ type methodAnalyzer struct {
 	pass           *analysis.Pass
 	ifaceMethods   map[*types.Func]methodInfo
 	usedMethods    map[*types.Func]bool
-	varAssignments map[string]string   // maps variable name to interface type name
-	concreteTypes  map[string][]string // maps variable name to concrete type names that were assigned
+	varAssignments map[string]string        // maps variable name to interface type name
+	concreteTypes  map[string][]string      // maps variable name to concrete type names that were assigned
+	methodsByName  map[string][]*types.Func // Cache methods by name for faster lookup
 }
 
 // newMethodAnalyzer creates a new method analyzer
 func newMethodAnalyzer(pass *analysis.Pass, ifaceMethods map[*types.Func]methodInfo) *methodAnalyzer {
-	return &methodAnalyzer{
+	ma := &methodAnalyzer{
 		pass:           pass,
 		ifaceMethods:   ifaceMethods,
-		usedMethods:    make(map[*types.Func]bool),
-		varAssignments: make(map[string]string),
-		concreteTypes:  make(map[string][]string),
+		usedMethods:    make(map[*types.Func]bool, len(ifaceMethods)),
+		varAssignments: make(map[string]string, 64),
+		concreteTypes:  make(map[string][]string, 32),
+		methodsByName:  make(map[string][]*types.Func, len(ifaceMethods)/2),
 	}
+
+	// Build method name index for faster lookups
+	for method := range ifaceMethods {
+		name := method.Name()
+		ma.methodsByName[name] = append(ma.methodsByName[name], method)
+	}
+
+	return ma
 }
 
 // analyzeUsedMethods traverses AST and marks used methods
@@ -122,19 +148,19 @@ func analyzeUsedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]method
 
 // analyze performs the main analysis logic
 func (ma *methodAnalyzer) analyze() map[*types.Func]bool {
-	// First pass: collect variable assignments
-	ma.collectVarAssignments()
-
-	// Second pass: analyze method usage
 	ins := ma.pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 
+	// Single pass analysis combining both variable collection and method usage
 	nodeFilter := []ast.Node{
+		(*ast.GenDecl)(nil),
 		(*ast.SelectorExpr)(nil),
 		(*ast.CallExpr)(nil),
 	}
 
 	ins.Preorder(nodeFilter, func(n ast.Node) {
 		switch node := n.(type) {
+		case *ast.GenDecl:
+			ma.analyzeGenDecl(node)
 		case *ast.SelectorExpr:
 			ma.analyzeSelectorExpr(node)
 		case *ast.CallExpr:
@@ -145,78 +171,71 @@ func (ma *methodAnalyzer) analyze() map[*types.Func]bool {
 	return ma.usedMethods
 }
 
-// collectVarAssignments collects variable to interface assignments
-func (ma *methodAnalyzer) collectVarAssignments() {
-	ins := ma.pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	nodeFilter := []ast.Node{
-		(*ast.GenDecl)(nil),
-		(*ast.AssignStmt)(nil),
+// analyzeGenDecl handles variable declarations - replaces collectVarAssignments
+func (ma *methodAnalyzer) analyzeGenDecl(stmt *ast.GenDecl) {
+	if stmt.Tok != token.VAR {
+		return
 	}
 
-	ins.Preorder(nodeFilter, func(n ast.Node) {
-		switch stmt := n.(type) {
-		case *ast.GenDecl:
-			if stmt.Tok != token.VAR {
-				return
+	for _, spec := range stmt.Specs {
+		vs, ok := spec.(*ast.ValueSpec)
+		if !ok || len(vs.Values) != 1 || len(vs.Names) != 1 {
+			continue
+		}
+
+		// Check if left side is interface
+		lhsObj := ma.pass.TypesInfo.Defs[vs.Names[0]]
+		if lhsObj == nil {
+			continue
+		}
+		lhsType := lhsObj.Type()
+		if _, ok := lhsType.Underlying().(*types.Interface); !ok {
+			continue
+		}
+
+		lhsName := vs.Names[0].Name
+
+		// Check if right side is a variable
+		if rhsIdent, ok := vs.Values[0].(*ast.Ident); ok {
+			// Variable assignment
+			rhsObj := ma.pass.TypesInfo.Uses[rhsIdent]
+			if rhsObj == nil {
+				continue
 			}
-			for _, spec := range stmt.Specs {
-				vs, ok := spec.(*ast.ValueSpec)
-				if !ok || len(vs.Values) != 1 || len(vs.Names) != 1 {
-					continue
-				}
+			rhsType := rhsObj.Type()
 
-				// Check if left side is interface
-				lhsObj := ma.pass.TypesInfo.Defs[vs.Names[0]]
-				if lhsObj == nil {
-					continue
+			// Store mapping: when we see calls on lhs variable, check rhs type too
+			if rhsTypeName := getTypeName(rhsType); rhsTypeName != "" {
+				ma.varAssignments[lhsName] = rhsTypeName
+				if verbose {
+					fmt.Fprintf(os.Stderr, "[DEBUG] Variable assignment: %s = %s (type %s)\n",
+						lhsName, rhsIdent.Name, rhsTypeName)
 				}
-				lhsType := lhsObj.Type()
-				if _, ok := lhsType.Underlying().(*types.Interface); !ok {
-					continue
-				}
-
-				// Check if right side is a variable
-				rhsIdent, ok := vs.Values[0].(*ast.Ident)
-				if ok {
-					// Variable assignment
-					rhsObj := ma.pass.TypesInfo.Uses[rhsIdent]
-					if rhsObj == nil {
-						continue
-					}
-					rhsType := rhsObj.Type()
-
-					// Store mapping: when we see calls on lhs variable, check rhs type too
-					lhsName := vs.Names[0].Name
-					rhsTypeName := getTypeName(rhsType)
-					if rhsTypeName != "" {
-						ma.varAssignments[lhsName] = rhsTypeName
-						if verbose {
-							fmt.Fprintf(os.Stderr, "[DEBUG] Variable assignment: %s = %s (type %s)\n",
-								lhsName, rhsIdent.Name, rhsTypeName)
+			}
+		} else if unary, ok := vs.Values[0].(*ast.UnaryExpr); ok && unary.Op == token.AND {
+			// Handle &Type{} assignments
+			rhsType := ma.pass.TypesInfo.TypeOf(vs.Values[0])
+			if rhsType != nil {
+				// Get the underlying type (without pointer)
+				if ptr, ok := rhsType.(*types.Pointer); ok {
+					elemType := ptr.Elem()
+					if named, ok := elemType.(*types.Named); ok {
+						typeName := named.Obj().Name()
+						// Avoid slice allocation if possible
+						if ma.concreteTypes[lhsName] == nil {
+							ma.concreteTypes[lhsName] = []string{typeName}
+						} else {
+							ma.concreteTypes[lhsName] = append(ma.concreteTypes[lhsName], typeName)
 						}
-					}
-				} else if unary, ok := vs.Values[0].(*ast.UnaryExpr); ok && unary.Op == token.AND {
-					// Handle &Type{} assignments
-					rhsType := ma.pass.TypesInfo.TypeOf(vs.Values[0])
-					if rhsType != nil {
-						// Get the underlying type (without pointer)
-						if ptr, ok := rhsType.(*types.Pointer); ok {
-							elemType := ptr.Elem()
-							if named, ok := elemType.(*types.Named); ok {
-								lhsName := vs.Names[0].Name
-								typeName := named.Obj().Name()
-								ma.concreteTypes[lhsName] = append(ma.concreteTypes[lhsName], typeName)
-								if verbose {
-									fmt.Fprintf(os.Stderr, "[DEBUG] Concrete type assignment: %s = &%s{}\n",
-										lhsName, typeName)
-								}
-							}
+						if verbose {
+							fmt.Fprintf(os.Stderr, "[DEBUG] Concrete type assignment: %s = &%s{}\n",
+								lhsName, typeName)
 						}
 					}
 				}
 			}
 		}
-	})
+	}
 }
 
 // analyzeSelectorExpr handles method calls through selectors
@@ -232,38 +251,58 @@ func (ma *methodAnalyzer) analyzeSelectorExpr(node *ast.SelectorExpr) {
 	ma.markMatchingMethods(calledMethod, recv)
 
 	// Also check if receiver is a variable that was assigned from another interface
-	if ident, ok := node.X.(*ast.Ident); ok {
-		if sourceType, found := ma.varAssignments[ident.Name]; found {
-			// Mark methods on the source interface type as used too
-			for ifaceMethod, info := range ma.ifaceMethods {
-				if info.ifaceName == sourceType &&
-					ifaceMethod.Name() == calledMethod.Name() &&
-					types.Identical(ifaceMethod.Type(), calledMethod.Type()) {
-					ma.usedMethods[ifaceMethod] = true
-					if verbose {
-						fmt.Fprintf(os.Stderr, "[DEBUG] Marking %s.%s as used (from variable assignment)\n",
-							sourceType, ifaceMethod.Name())
-					}
+	ident, isIdent := node.X.(*ast.Ident)
+	if !isIdent {
+		return
+	}
+
+	identName := ident.Name
+	calledMethodName := calledMethod.Name()
+
+	// Check only methods with matching names to avoid unnecessary iteration
+	candidates, hasCandidates := ma.methodsByName[calledMethodName]
+	if !hasCandidates {
+		return
+	}
+
+	// Check variable assignments
+	if sourceType, found := ma.varAssignments[identName]; found {
+		for _, ifaceMethod := range candidates {
+			if ma.usedMethods[ifaceMethod] {
+				continue
+			}
+			info := ma.ifaceMethods[ifaceMethod]
+			if info.ifaceName == sourceType &&
+				types.Identical(ifaceMethod.Type(), calledMethod.Type()) {
+				ma.usedMethods[ifaceMethod] = true
+				if verbose {
+					fmt.Fprintf(os.Stderr, "[DEBUG] Marking %s.%s as used (from variable assignment)\n",
+						sourceType, ifaceMethod.Name())
 				}
 			}
 		}
+	}
 
-		// Check if receiver is a variable that had concrete types assigned
-		if concreteTypes, found := ma.concreteTypes[ident.Name]; found {
+	// Check concrete type assignments
+	if concreteTypes, found := ma.concreteTypes[identName]; found {
+		for _, ifaceMethod := range candidates {
+			if ma.usedMethods[ifaceMethod] {
+				continue
+			}
+			if !types.Identical(ifaceMethod.Type(), calledMethod.Type()) {
+				continue
+			}
+
+			info := ma.ifaceMethods[ifaceMethod]
 			// For each concrete type that was assigned to this variable
 			for _, typeName := range concreteTypes {
-				// Check all interfaces in our list
-				for ifaceMethod, info := range ma.ifaceMethods {
-					// If the method matches and the concrete type implements this interface
-					if ifaceMethod.Name() == calledMethod.Name() &&
-						types.Identical(ifaceMethod.Type(), calledMethod.Type()) &&
-						ma.concreteTypeImplementsInterface(typeName, info.iface) {
-						ma.usedMethods[ifaceMethod] = true
-						if verbose {
-							fmt.Fprintf(os.Stderr, "[DEBUG] Marking %s.%s as used (concrete type %s implements it)\n",
-								info.ifaceName, ifaceMethod.Name(), typeName)
-						}
+				if ma.concreteTypeImplementsInterface(typeName, info.iface) {
+					ma.usedMethods[ifaceMethod] = true
+					if verbose {
+						fmt.Fprintf(os.Stderr, "[DEBUG] Marking %s.%s as used (concrete type %s implements it)\n",
+							info.ifaceName, ifaceMethod.Name(), typeName)
 					}
+					break // No need to check other concrete types for this method
 				}
 			}
 		}
@@ -272,11 +311,24 @@ func (ma *methodAnalyzer) analyzeSelectorExpr(node *ast.SelectorExpr) {
 
 // markMatchingMethods marks interface methods that match the called method
 func (ma *methodAnalyzer) markMatchingMethods(calledMethod *types.Func, recv types.Type) {
-	for ifaceMethod, info := range ma.ifaceMethods {
+	// Early exit if all methods are already marked as used
+	if len(ma.usedMethods) == len(ma.ifaceMethods) {
+		return
+	}
+
+	// First, check only methods with matching names
+	calledName := calledMethod.Name()
+	candidates, hasCandidates := ma.methodsByName[calledName]
+	if !hasCandidates {
+		return // No interface methods with this name
+	}
+
+	for _, ifaceMethod := range candidates {
 		if ma.usedMethods[ifaceMethod] {
 			continue
 		}
 
+		info := ma.ifaceMethods[ifaceMethod]
 		if ma.isMethodMatch(calledMethod, ifaceMethod, recv, info) {
 			ma.usedMethods[ifaceMethod] = true
 		}
@@ -285,6 +337,13 @@ func (ma *methodAnalyzer) markMatchingMethods(calledMethod *types.Func, recv typ
 
 // isMethodMatch checks if called method matches interface method
 func (ma *methodAnalyzer) isMethodMatch(calledMethod, ifaceMethod *types.Func, recv types.Type, info methodInfo) bool {
+	// Handle nil receiver
+	if recv == nil {
+		// For nil receiver, we can only match by name and signature
+		return calledMethod.Name() == ifaceMethod.Name() &&
+			types.Identical(calledMethod.Type(), ifaceMethod.Type())
+	}
+
 	// direct match - this is the most reliable way
 	if calledMethod == ifaceMethod {
 		return true
@@ -393,12 +452,27 @@ func (ma *methodAnalyzer) analyzeFmtCall(node *ast.CallExpr) {
 
 // checkStringerUsage checks if argument implements Stringer interface
 func (ma *methodAnalyzer) checkStringerUsage(argType types.Type) {
-	for ifaceMethod, info := range ma.ifaceMethods {
+	// Only check String() methods - use name index for faster lookup
+	stringMethods, hasStringMethods := ma.methodsByName["String"]
+	if !hasStringMethods {
+		return
+	}
+
+	for _, ifaceMethod := range stringMethods {
 		if ma.usedMethods[ifaceMethod] {
 			continue
 		}
 
-		if ma.isStringerMethod(ifaceMethod) && types.Implements(argType, info.iface) {
+		if !ma.isStringerMethod(ifaceMethod) {
+			continue
+		}
+
+		info := ma.ifaceMethods[ifaceMethod]
+		// Check for nil interface to avoid panic
+		if info.iface == nil {
+			continue
+		}
+		if types.Implements(argType, info.iface) {
 			ma.usedMethods[ifaceMethod] = true
 		}
 	}
@@ -469,17 +543,32 @@ func getTypeName(t types.Type) string {
 	return ""
 }
 
+// typeCache caches type lookups to avoid repeated searches
+var typeCache = make(map[string]types.Type)
+
 // concreteTypeImplementsInterface checks if a concrete type implements an interface
 func (ma *methodAnalyzer) concreteTypeImplementsInterface(typeName string, iface *types.Interface) bool {
+	// Check cache first
+	if cachedType, found := typeCache[typeName]; found {
+		if named, ok := cachedType.(*types.Named); ok {
+			return types.Implements(named, iface) || types.Implements(types.NewPointer(named), iface)
+		}
+		return false
+	}
+
 	// Find the type by name in the package
 	for _, obj := range ma.pass.TypesInfo.Defs {
 		if obj == nil {
 			continue
 		}
-		if named, ok := obj.Type().(*types.Named); ok && obj.Name() == typeName {
-			// Check both pointer and non-pointer receivers
-			if types.Implements(named, iface) || types.Implements(types.NewPointer(named), iface) {
-				return true
+		if obj.Name() == typeName {
+			if named, ok := obj.Type().(*types.Named); ok {
+				// Cache the type for future lookups
+				typeCache[typeName] = named
+				// Check both pointer and non-pointer receivers
+				if types.Implements(named, iface) || types.Implements(types.NewPointer(named), iface) {
+					return true
+				}
 			}
 		}
 	}
