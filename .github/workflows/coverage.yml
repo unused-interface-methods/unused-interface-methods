@@ -35,9 +35,11 @@ jobs:
       - name: Run tests and generate coverage
         run: |
           mkdir -p .coverage
-          go test -covermode=count -coverprofile=.coverage/.out -coverpkg=./... ./...
-          go tool cover -func=.coverage/.out -o=.coverage/.txt
-          go tool cover -html=.coverage/.out -o=.coverage/.html
+          go test -covermode=atomic -coverprofile=.coverage/.out -coverpkg=./... ./...
+          COVERAGE_EXCLUDE="(mocks|_easyjson\.go)"
+          grep -vE "$COVERAGE_EXCLUDE" .coverage/.out > .coverage/.txt
+          rm .coverage/.out
+          go tool cover -html=.coverage/.txt -o=.coverage/.html
 
       - name: Go Coverage Badge
         uses: tj-actions/coverage-badge-go@v2

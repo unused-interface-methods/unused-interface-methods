@@ -128,15 +128,15 @@ func collectInterfaceMethods(pass *analysis.Pass) map[*types.Func]methodInfo <sp
                         relPath = filename
                 }</span>
 
-                <span class="cov2" title="3">if verbose </span><span class="cov0" title="0">{
-                        fmt.Fprintf(os.Stderr, "[DEBUG] File: %s\n", relPath)
-                }</span>
                 <span class="cov2" title="3">if cfg.ShouldIgnore(relPath) </span><span class="cov0" title="0">{
                         if verbose </span><span class="cov0" title="0">{
                                 fmt.Fprintf(os.Stderr, "[DEBUG] Skipping file: %s\n", relPath)
                         }</span>
                         <span class="cov0" title="0">continue</span>
                 }
+                <span class="cov2" title="3">if verbose </span><span class="cov0" title="0">{
+                        fmt.Fprintf(os.Stderr, "[DEBUG] File: %s\n", relPath)
+                }</span>
 
                 <span class="cov2" title="3">for _, decl := range file.Decls </span><span class="cov5" title="122">{
                         gd, ok := decl.(*ast.GenDecl)
@@ -387,13 +387,13 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
                 }</span>
         }
 
-        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="361">{
+        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="327">{
                 posI := pass.Fset.Position(unused[i].method.Pos())
                 posJ := pass.Fset.Position(unused[j].method.Pos())
-                if posI.Filename != posJ.Filename </span><span class="cov5" title="105">{
+                if posI.Filename != posJ.Filename </span><span class="cov5" title="106">{
                         return posI.Filename &lt; posJ.Filename
                 }</span>
-                <span class="cov6" title="256">return posI.Line &lt; posJ.Line</span>
+                <span class="cov6" title="221">return posI.Line &lt; posJ.Line</span>
         })
 
         <span class="cov1" title="1">for _, info := range unused </span><span class="cov4" title="59">{
