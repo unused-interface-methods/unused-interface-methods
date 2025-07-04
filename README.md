@@ -79,8 +79,6 @@ The configuration file is automatically searched in the current directory (or `.
 
 `Ctrl+Shift+P` (`Cmd+Shift+P` on Mac) → "Tasks: Run Task" → "Go: Check Unused Interface Methods"
 
-### ✨ Features
-
 - ✅ **Real-time highlighting** of unused interface methods
 - ✅ **Problems panel** integration with clickable errors
 - ✅ **File explorer markers** showing files with issues
