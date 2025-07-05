@@ -3,7 +3,7 @@
   "tasks": [
     {
       "label": "Go: Check Unused Interface Methods",
-      // "type": "shell",
+      "type": "shell",
       "command": "${command:go.buildTags}",
       "windows": {
         "command": "unused-interface-methods.exe"
@@ -20,12 +20,12 @@
         "isDefault": false
       },
       "presentation": {
-        "echo": true,
-        "reveal": "silent",
+        "echo": false,
         "focus": false,
+        "reveal": "never",
         "panel": "shared",
-        "showReuseMessage": true,
-        "clear": false
+        "showReuseMessage": false,
+        "clear": true
       },
       "problemMatcher": {
         "owner": "go",

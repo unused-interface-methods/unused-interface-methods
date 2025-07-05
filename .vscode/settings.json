@@ -1,0 +1,5 @@
+{
+  "triggerTaskOnSave.tasks": {
+    "Go: Check Unused Interface Methods": ["*.go"]
+  }
+}
