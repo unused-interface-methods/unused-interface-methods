@@ -7,7 +7,9 @@ else
     RM_CMD = rm -f
 endif
 
-.PHONY: lint build test bench clean try
+.PHONY: all lint build test bench clean try
+
+all: lint test build
 
 # Run golangci-lint
 lint:
@@ -15,7 +17,7 @@ lint:
 
 # Build our custom unused-interface-methods linter
 build:
-	go build -o $(BINARY_NAME) .
+	go build -o $(BINARY_NAME) ./cmd/unused-interface-methods
 
 # Run tests
 test:
