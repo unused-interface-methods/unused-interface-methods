@@ -1,8 +1,17 @@
+version: "2"
+
+run:
+  timeout: 1m
+
 linters:
   enable:
     - govet
-    - unused
-    - ineffassign
+    - errcheck
+    - staticcheck
 
-run:
-  timeout: 10m
+  exclusions:
+    paths:
+      - sample
+      - internal/analizer_old
+      - internal/analizer_palallel
+      - "_test\\.go$"

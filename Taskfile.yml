@@ -18,7 +18,7 @@ tasks:
   build:
     desc: "build unused-interface-methods linter"
     cmds:
-      - go build -o {{.BINARY_NAME}} .
+      - go build -o {{.BINARY_NAME}} ./cmd/unused-interface-methods
 
   test:
     desc: "run tests"
