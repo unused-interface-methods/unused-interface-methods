@@ -1,8 +1,5 @@
 version: "2"
 
-run:
-  timeout: 1m
-
 linters:
   enable:
     - govet
@@ -10,7 +7,4 @@ linters:
 
   exclusions:
     paths:
-      - sample
-      - internal/analizer_old
-      - internal/analizer_palallel
       - "_test\\.go$"
