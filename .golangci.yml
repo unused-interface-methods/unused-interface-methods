@@ -7,7 +7,6 @@ linters:
   enable:
     - govet
     - errcheck
-    - staticcheck
 
   exclusions:
     paths:
