@@ -55,7 +55,7 @@
 			<div id="nav">
 				<select id="files">
 				
-				<option value="file0">github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go (87.5%)</option>
+				<option value="file0">github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go (88.1%)</option>
 				
 				<option value="file1">github.com/unused-interface-methods/unused-interface-methods/internal/analizer/init.go (72.2%)</option>
 				
@@ -95,7 +95,6 @@ import (
         "path/filepath"
         "sort"
         "strings"
-        "sync"
 
         "golang.org/x/tools/go/analysis"
         "golang.org/x/tools/go/analysis/passes/inspect"
@@ -119,20 +118,18 @@ type methodInfo struct {
         used      bool             // used flag
 }
 
-// pathCache caches relative paths to avoid repeated filepath.Rel calls
-var pathCache sync.Map
-
 // collectInterfaceMethods collects all explicit interface methods in the package.
 func collectInterfaceMethods(pass *analysis.Pass) map[*types.Func]methodInfo <span class="cov1" title="1">{
         ifaceMethods := make(map[*types.Func]methodInfo, 32) // Pre-allocate with reasonable capacity
+        pathCache := make(map[string]string)                 // Local cache for this analysis run
 
         for _, file := range pass.Files </span><span class="cov2" title="3">{
                 filename := pass.Fset.Position(file.Pos()).Filename
 
                 // Check path cache first
                 var relPath string
-                if cached, ok := pathCache.Load(filename); ok </span><span class="cov0" title="0">{
-                        relPath = cached.(string)
+                if cached, ok := pathCache[filename]; ok </span><span class="cov0" title="0">{
+                        relPath = cached
                 }</span> else<span class="cov2" title="3"> {
                         var err error
                         relPath, err = filepath.Rel(basePath, filename)
@@ -141,7 +138,7 @@ func collectInterfaceMethods(pass *analysis.Pass) map[*types.Func]methodInfo <sp
                         }</span>
                         // Normalize path separators for consistency
                         <span class="cov2" title="3">relPath = strings.ReplaceAll(relPath, "\\", "/")
-                        pathCache.Store(filename, relPath)</span>
+                        pathCache[filename] = relPath</span>
                 }
 
                 <span class="cov2" title="3">if cfg.ShouldIgnore(relPath) </span><span class="cov0" title="0">{
@@ -154,35 +151,35 @@ func collectInterfaceMethods(pass *analysis.Pass) map[*types.Func]methodInfo <sp
                         fmt.Fprintf(os.Stderr, "[DEBUG] File: %s\n", relPath)
                 }</span>
 
-                <span class="cov2" title="3">for _, decl := range file.Decls </span><span class="cov8" title="122">{
+                <span class="cov2" title="3">for _, decl := range file.Decls </span><span class="cov5" title="122">{
                         gd, ok := decl.(*ast.GenDecl)
-                        if !ok || gd.Tok != token.TYPE </span><span class="cov6" title="49">{
+                        if !ok || gd.Tok != token.TYPE </span><span class="cov4" title="49">{
                                 continue</span>
                         }
-                        <span class="cov7" title="73">for _, spec := range gd.Specs </span><span class="cov7" title="73">{
+                        <span class="cov5" title="73">for _, spec := range gd.Specs </span><span class="cov5" title="73">{
                                 tspec := spec.(*ast.TypeSpec)
-                                if _, ok := tspec.Type.(*ast.InterfaceType); !ok </span><span class="cov5" title="20">{
+                                if _, ok := tspec.Type.(*ast.InterfaceType); !ok </span><span class="cov3" title="20">{
                                         continue</span>
                                 }
-                                <span class="cov6" title="53">obj := pass.TypesInfo.Defs[tspec.Name]
+                                <span class="cov4" title="53">obj := pass.TypesInfo.Defs[tspec.Name]
                                 if obj == nil </span><span class="cov0" title="0">{
                                         continue</span>
                                 }
-                                <span class="cov6" title="53">named, ok := obj.Type().(*types.Named)
+                                <span class="cov4" title="53">named, ok := obj.Type().(*types.Named)
                                 if !ok </span><span class="cov0" title="0">{
                                         continue</span>
                                 }
-                                <span class="cov6" title="53">ifaceType, ok := named.Underlying().(*types.Interface)
+                                <span class="cov4" title="53">ifaceType, ok := named.Underlying().(*types.Interface)
                                 if !ok </span><span class="cov0" title="0">{
                                         continue</span>
                                 }
 
-                                <span class="cov6" title="53">for i := 0; i &lt; ifaceType.NumExplicitMethods(); i++ </span><span class="cov8" title="122">{
+                                <span class="cov4" title="53">for i := 0; i &lt; ifaceType.NumExplicitMethods(); i++ </span><span class="cov5" title="122">{
                                         m := ifaceType.ExplicitMethod(i)
                                         if m == nil </span><span class="cov0" title="0">{
                                                 continue</span>
                                         }
-                                        <span class="cov8" title="122">ifaceMethods[m] = methodInfo{
+                                        <span class="cov5" title="122">ifaceMethods[m] = methodInfo{
                                                 ifaceName: tspec.Name.Name,
                                                 iface:     ifaceType,
                                                 method:    m,
@@ -208,22 +205,32 @@ type methodAnalyzer struct {
 
 // newMethodAnalyzer creates a new method analyzer
 func newMethodAnalyzer(pass *analysis.Pass, ifaceMethods map[*types.Func]methodInfo) *methodAnalyzer <span class="cov1" title="1">{
-        ma := &amp;methodAnalyzer{
+        return &amp;methodAnalyzer{
                 pass:           pass,
                 ifaceMethods:   ifaceMethods,
-                usedMethods:    make(map[*types.Func]bool, len(ifaceMethods)),
-                varAssignments: make(map[string]string, 64),
-                concreteTypes:  make(map[string][]string, 32),
-                methodsByName:  make(map[string][]*types.Func, len(ifaceMethods)/2),
+                usedMethods:    make(map[*types.Func]bool),
+                varAssignments: make(map[string]string),
+                concreteTypes:  make(map[string][]string),
+                methodsByName:  make(map[string][]*types.Func),
         }
+}</span>
 
-        // Build method name index for faster lookups
-        for method := range ifaceMethods </span><span class="cov8" title="122">{
-                name := method.Name()
-                ma.methodsByName[name] = append(ma.methodsByName[name], method)
+// getMethodsByName returns methods with the given name, building cache lazily
+func (ma *methodAnalyzer) getMethodsByName(name string) []*types.Func <span class="cov5" title="136">{
+        if methods, cached := ma.methodsByName[name]; cached </span><span class="cov5" title="70">{
+                return methods
         }</span>
 
-        <span class="cov1" title="1">return ma</span>
+        // Build cache entry for this name only
+        <span class="cov5" title="66">var methods []*types.Func
+        for method := range ma.ifaceMethods </span><span class="cov10" title="8052">{
+                if method.Name() == name </span><span class="cov5" title="77">{
+                        methods = append(methods, method)
+                }</span>
+        }
+
+        <span class="cov5" title="66">ma.methodsByName[name] = methods
+        return methods</span>
 }
 
 // analyzeUsedMethods traverses AST and marks used methods
@@ -243,13 +250,13 @@ func (ma *methodAnalyzer) analyze() map[*types.Func]bool <span class="cov1" titl
                 (*ast.CallExpr)(nil),
         }
 
-        ins.Preorder(nodeFilter, func(n ast.Node) </span><span class="cov9" title="371">{
+        ins.Preorder(nodeFilter, func(n ast.Node) </span><span class="cov6" title="371">{
                 switch node := n.(type) </span>{
-                case *ast.GenDecl:<span class="cov7" title="89">
+                case *ast.GenDecl:<span class="cov5" title="89">
                         ma.analyzeGenDecl(node)</span>
-                case *ast.SelectorExpr:<span class="cov8" title="172">
+                case *ast.SelectorExpr:<span class="cov6" title="172">
                         ma.analyzeSelectorExpr(node)</span>
-                case *ast.CallExpr:<span class="cov7" title="110">
+                case *ast.CallExpr:<span class="cov5" title="110">
                         ma.analyzeCallExpr(node)</span>
                 }
         })
@@ -258,62 +265,62 @@ func (ma *methodAnalyzer) analyze() map[*types.Func]bool <span class="cov1" titl
 }
 
 // analyzeGenDecl handles variable declarations - replaces collectVarAssignments
-func (ma *methodAnalyzer) analyzeGenDecl(stmt *ast.GenDecl) <span class="cov7" title="89">{
-        if stmt.Tok != token.VAR </span><span class="cov7" title="75">{
+func (ma *methodAnalyzer) analyzeGenDecl(stmt *ast.GenDecl) <span class="cov5" title="89">{
+        if stmt.Tok != token.VAR </span><span class="cov5" title="75">{
                 return
         }</span>
 
-        <span class="cov4" title="14">for _, spec := range stmt.Specs </span><span class="cov4" title="14">{
+        <span class="cov3" title="14">for _, spec := range stmt.Specs </span><span class="cov3" title="14">{
                 vs, ok := spec.(*ast.ValueSpec)
                 if !ok || len(vs.Values) != 1 || len(vs.Names) != 1 </span><span class="cov1" title="1">{
                         continue</span>
                 }
 
                 // Check if left side is interface
-                <span class="cov4" title="13">lhsObj := ma.pass.TypesInfo.Defs[vs.Names[0]]
+                <span class="cov3" title="13">lhsObj := ma.pass.TypesInfo.Defs[vs.Names[0]]
                 if lhsObj == nil </span><span class="cov0" title="0">{
                         continue</span>
                 }
-                <span class="cov4" title="13">lhsType := lhsObj.Type()
+                <span class="cov3" title="13">lhsType := lhsObj.Type()
                 if _, ok := lhsType.Underlying().(*types.Interface); !ok </span><span class="cov1" title="1">{
                         continue</span>
                 }
 
-                <span class="cov4" title="12">lhsName := vs.Names[0].Name
+                <span class="cov3" title="12">lhsName := vs.Names[0].Name
 
                 // Check if right side is a variable
-                if rhsIdent, ok := vs.Values[0].(*ast.Ident); ok </span><span class="cov3" title="4">{
+                if rhsIdent, ok := vs.Values[0].(*ast.Ident); ok </span><span class="cov2" title="4">{
                         // Variable assignment
                         rhsObj := ma.pass.TypesInfo.Uses[rhsIdent]
                         if rhsObj == nil </span><span class="cov0" title="0">{
                                 continue</span>
                         }
-                        <span class="cov3" title="4">rhsType := rhsObj.Type()
+                        <span class="cov2" title="4">rhsType := rhsObj.Type()
 
                         // Store mapping: when we see calls on lhs variable, check rhs type too
-                        if rhsTypeName := getTypeName(rhsType); rhsTypeName != "" </span><span class="cov2" title="2">{
+                        if rhsTypeName := getTypeName(rhsType); rhsTypeName != "" </span><span class="cov1" title="2">{
                                 ma.varAssignments[lhsName] = rhsTypeName
                                 if verbose </span><span class="cov0" title="0">{
                                         fmt.Fprintf(os.Stderr, "[DEBUG] Variable assignment: %s = %s (type %s)\n",
                                                 lhsName, rhsIdent.Name, rhsTypeName)
                                 }</span>
                         }
-                } else<span class="cov4" title="8"> if unary, ok := vs.Values[0].(*ast.UnaryExpr); ok &amp;&amp; unary.Op == token.AND </span><span class="cov3" title="4">{
+                } else<span class="cov3" title="8"> if unary, ok := vs.Values[0].(*ast.UnaryExpr); ok &amp;&amp; unary.Op == token.AND </span><span class="cov2" title="4">{
                         // Handle &amp;Type{} assignments
                         rhsType := ma.pass.TypesInfo.TypeOf(vs.Values[0])
-                        if rhsType != nil </span><span class="cov3" title="4">{
+                        if rhsType != nil </span><span class="cov2" title="4">{
                                 // Get the underlying type (without pointer)
-                                if ptr, ok := rhsType.(*types.Pointer); ok </span><span class="cov3" title="4">{
+                                if ptr, ok := rhsType.(*types.Pointer); ok </span><span class="cov2" title="4">{
                                         elemType := ptr.Elem()
-                                        if named, ok := elemType.(*types.Named); ok </span><span class="cov3" title="4">{
+                                        if named, ok := elemType.(*types.Named); ok </span><span class="cov2" title="4">{
                                                 typeName := named.Obj().Name()
                                                 // Avoid slice allocation if possible
-                                                if ma.concreteTypes[lhsName] == nil </span><span class="cov3" title="4">{
+                                                if ma.concreteTypes[lhsName] == nil </span><span class="cov2" title="4">{
                                                         ma.concreteTypes[lhsName] = []string{typeName}
                                                 }</span> else<span class="cov0" title="0"> {
                                                         ma.concreteTypes[lhsName] = append(ma.concreteTypes[lhsName], typeName)
                                                 }</span>
-                                                <span class="cov3" title="4">if verbose </span><span class="cov0" title="0">{
+                                                <span class="cov2" title="4">if verbose </span><span class="cov0" title="0">{
                                                         fmt.Fprintf(os.Stderr, "[DEBUG] Concrete type assignment: %s = &amp;%s{}\n",
                                                                 lhsName, typeName)
                                                 }</span>
@@ -325,41 +332,41 @@ func (ma *methodAnalyzer) analyzeGenDecl(stmt *ast.GenDecl) <span class="cov7" t
 }
 
 // analyzeSelectorExpr handles method calls through selectors
-func (ma *methodAnalyzer) analyzeSelectorExpr(node *ast.SelectorExpr) <span class="cov8" title="172">{
+func (ma *methodAnalyzer) analyzeSelectorExpr(node *ast.SelectorExpr) <span class="cov6" title="172">{
         sel := ma.pass.TypesInfo.Selections[node]
-        if sel == nil || (sel.Kind() != types.MethodVal &amp;&amp; sel.Kind() != types.MethodExpr) </span><span class="cov7" title="82">{
+        if sel == nil || (sel.Kind() != types.MethodVal &amp;&amp; sel.Kind() != types.MethodExpr) </span><span class="cov5" title="82">{
                 return
         }</span>
 
-        <span class="cov7" title="90">calledMethod := sel.Obj().(*types.Func)
+        <span class="cov5" title="90">calledMethod := sel.Obj().(*types.Func)
         recv := sel.Recv()
 
         ma.markMatchingMethods(calledMethod, recv)
 
         // Also check if receiver is a variable that was assigned from another interface
         ident, isIdent := node.X.(*ast.Ident)
-        if !isIdent </span><span class="cov6" title="45">{
+        if !isIdent </span><span class="cov4" title="45">{
                 return
         }</span>
 
-        <span class="cov6" title="45">identName := ident.Name
+        <span class="cov4" title="45">identName := ident.Name
         calledMethodName := calledMethod.Name()
 
         // Check only methods with matching names to avoid unnecessary iteration
-        candidates, hasCandidates := ma.methodsByName[calledMethodName]
-        if !hasCandidates </span><span class="cov5" title="18">{
+        candidates := ma.getMethodsByName(calledMethodName)
+        if len(candidates) == 0 </span><span class="cov3" title="18">{
                 return
         }</span>
 
         // Check variable assignments
-        <span class="cov5" title="27">if sourceType, found := ma.varAssignments[identName]; found </span><span class="cov2" title="2">{
-                for _, ifaceMethod := range candidates </span><span class="cov4" title="11">{
-                        if ma.usedMethods[ifaceMethod] </span><span class="cov3" title="4">{
+        <span class="cov4" title="27">if sourceType, found := ma.varAssignments[identName]; found </span><span class="cov1" title="2">{
+                for _, ifaceMethod := range candidates </span><span class="cov3" title="11">{
+                        if ma.usedMethods[ifaceMethod] </span><span class="cov2" title="4">{
                                 continue</span>
                         }
-                        <span class="cov3" title="7">info := ma.ifaceMethods[ifaceMethod]
+                        <span class="cov2" title="7">info := ma.ifaceMethods[ifaceMethod]
                         if info.ifaceName == sourceType &amp;&amp;
-                                types.Identical(ifaceMethod.Type(), calledMethod.Type()) </span><span class="cov2" title="2">{
+                                types.Identical(ifaceMethod.Type(), calledMethod.Type()) </span><span class="cov1" title="2">{
                                 ma.usedMethods[ifaceMethod] = true
                                 if verbose </span><span class="cov0" title="0">{
                                         fmt.Fprintf(os.Stderr, "[DEBUG] Marking %s.%s as used (from variable assignment)\n",
@@ -370,25 +377,25 @@ func (ma *methodAnalyzer) analyzeSelectorExpr(node *ast.SelectorExpr) <span clas
         }
 
         // Check concrete type assignments
-        <span class="cov5" title="27">if concreteTypes, found := ma.concreteTypes[identName]; found </span><span class="cov3" title="5">{
-                for _, ifaceMethod := range candidates </span><span class="cov3" title="7">{
-                        if ma.usedMethods[ifaceMethod] </span><span class="cov2" title="2">{
+        <span class="cov4" title="27">if concreteTypes, found := ma.concreteTypes[identName]; found </span><span class="cov2" title="5">{
+                for _, ifaceMethod := range candidates </span><span class="cov2" title="7">{
+                        if ma.usedMethods[ifaceMethod] </span><span class="cov1" title="2">{
                                 continue</span>
                         }
-                        <span class="cov3" title="5">if !types.Identical(ifaceMethod.Type(), calledMethod.Type()) </span><span class="cov2" title="3">{
+                        <span class="cov2" title="5">if !types.Identical(ifaceMethod.Type(), calledMethod.Type()) </span><span class="cov2" title="3">{
                                 continue</span>
                         }
 
-                        <span class="cov2" title="2">info := ma.ifaceMethods[ifaceMethod]
+                        <span class="cov1" title="2">info := ma.ifaceMethods[ifaceMethod]
                         // For each concrete type that was assigned to this variable
-                        for _, typeName := range concreteTypes </span><span class="cov2" title="2">{
-                                if ma.concreteTypeImplementsInterface(typeName, info.iface) </span><span class="cov2" title="2">{
+                        for _, typeName := range concreteTypes </span><span class="cov1" title="2">{
+                                if ma.concreteTypeImplementsInterface(typeName, info.iface) </span><span class="cov1" title="2">{
                                         ma.usedMethods[ifaceMethod] = true
                                         if verbose </span><span class="cov0" title="0">{
                                                 fmt.Fprintf(os.Stderr, "[DEBUG] Marking %s.%s as used (concrete type %s implements it)\n",
                                                         info.ifaceName, ifaceMethod.Name(), typeName)
                                         }</span>
-                                        <span class="cov2" title="2">break</span> // No need to check other concrete types for this method
+                                        <span class="cov1" title="2">break</span> // No need to check other concrete types for this method
                                 }
                         }
                 }
@@ -396,33 +403,28 @@ func (ma *methodAnalyzer) analyzeSelectorExpr(node *ast.SelectorExpr) <span clas
 }
 
 // markMatchingMethods marks interface methods that match the called method
-func (ma *methodAnalyzer) markMatchingMethods(calledMethod *types.Func, recv types.Type) <span class="cov7" title="90">{
-        // Early exit if all methods are already marked as used
-        if len(ma.usedMethods) == len(ma.ifaceMethods) </span><span class="cov0" title="0">{
-                return
-        }</span>
-
+func (ma *methodAnalyzer) markMatchingMethods(calledMethod *types.Func, recv types.Type) <span class="cov5" title="90">{
         // First, check only methods with matching names
-        <span class="cov7" title="90">calledName := calledMethod.Name()
-        candidates, hasCandidates := ma.methodsByName[calledName]
-        if !hasCandidates </span><span class="cov5" title="22">{
+        calledName := calledMethod.Name()
+        candidates := ma.getMethodsByName(calledName)
+        if len(candidates) == 0 </span><span class="cov4" title="22">{
                 return // No interface methods with this name
         }</span>
 
-        <span class="cov7" title="68">for _, ifaceMethod := range candidates </span><span class="cov8" title="131">{
-                if ma.usedMethods[ifaceMethod] </span><span class="cov5" title="20">{
+        <span class="cov5" title="68">for _, ifaceMethod := range candidates </span><span class="cov5" title="131">{
+                if ma.usedMethods[ifaceMethod] </span><span class="cov3" title="20">{
                         continue</span>
                 }
 
-                <span class="cov7" title="111">info := ma.ifaceMethods[ifaceMethod]
-                if ma.isMethodMatch(calledMethod, ifaceMethod, recv, info) </span><span class="cov6" title="57">{
+                <span class="cov5" title="111">info := ma.ifaceMethods[ifaceMethod]
+                if ma.isMethodMatch(calledMethod, ifaceMethod, recv, info) </span><span class="cov5" title="57">{
                         ma.usedMethods[ifaceMethod] = true
                 }</span>
         }
 }
 
 // isMethodMatch checks if called method matches interface method
-func (ma *methodAnalyzer) isMethodMatch(calledMethod, ifaceMethod *types.Func, recv types.Type, info methodInfo) bool <span class="cov7" title="111">{
+func (ma *methodAnalyzer) isMethodMatch(calledMethod, ifaceMethod *types.Func, recv types.Type, info methodInfo) bool <span class="cov5" title="111">{
         // Handle nil receiver
         if recv == nil </span><span class="cov0" title="0">{
                 // For nil receiver, we can only match by name and signature
@@ -431,26 +433,26 @@ func (ma *methodAnalyzer) isMethodMatch(calledMethod, ifaceMethod *types.Func, r
         }</span>
 
         // direct match - this is the most reliable way
-        <span class="cov7" title="111">if calledMethod == ifaceMethod </span><span class="cov6" title="49">{
+        <span class="cov5" title="111">if calledMethod == ifaceMethod </span><span class="cov4" title="49">{
                 return true
         }</span>
 
         // For any other match, we need exact name AND signature match
-        <span class="cov7" title="62">if calledMethod.Name() != ifaceMethod.Name() </span><span class="cov0" title="0">{
+        <span class="cov5" title="62">if calledMethod.Name() != ifaceMethod.Name() </span><span class="cov0" title="0">{
                 return false
         }</span>
 
         // For generic interfaces, we need to handle instantiated types
         // Check if the receiver is an instantiated generic type
-        <span class="cov7" title="62">if named, ok := recv.(*types.Named); ok </span><span class="cov6" title="57">{
+        <span class="cov5" title="62">if named, ok := recv.(*types.Named); ok </span><span class="cov5" title="57">{
                 // Check if this is an instance of our generic interface
-                if origin := named.Origin(); origin != nil &amp;&amp; origin != named </span><span class="cov4" title="13">{
+                if origin := named.Origin(); origin != nil &amp;&amp; origin != named </span><span class="cov3" title="13">{
                         // This is an instantiated generic, check if it matches our interface
                         originName := origin.Obj().Name()
-                        if originName == info.ifaceName </span><span class="cov3" title="5">{
+                        if originName == info.ifaceName </span><span class="cov2" title="5">{
                                 // This is an instantiation of our interface
                                 // We need to check if the method signatures match after substitution
-                                if ma.genericMethodsMatch(calledMethod, ifaceMethod, named, origin) </span><span class="cov3" title="5">{
+                                if ma.genericMethodsMatch(calledMethod, ifaceMethod, named, origin) </span><span class="cov2" title="5">{
                                         return true
                                 }</span>
                         }
@@ -458,22 +460,22 @@ func (ma *methodAnalyzer) isMethodMatch(calledMethod, ifaceMethod *types.Func, r
         }
 
         // Signature must be identical (for non-generic cases)
-        <span class="cov6" title="57">if !types.Identical(calledMethod.Type(), ifaceMethod.Type()) </span><span class="cov6" title="42">{
+        <span class="cov5" title="57">if !types.Identical(calledMethod.Type(), ifaceMethod.Type()) </span><span class="cov4" title="42">{
                 return false
         }</span>
 
         // Now check if the call is actually on this interface
         // For interface receivers, require exact match
-        <span class="cov4" title="15">if _, isIface := recv.Underlying().(*types.Interface); isIface </span><span class="cov4" title="11">{
+        <span class="cov3" title="15">if _, isIface := recv.Underlying().(*types.Interface); isIface </span><span class="cov3" title="11">{
                 return types.Identical(recv, info.iface)
         }</span>
 
         // For concrete receivers, check if they implement this specific interface
-        <span class="cov3" title="4">return types.Implements(recv, info.iface)</span>
+        <span class="cov2" title="4">return types.Implements(recv, info.iface)</span>
 }
 
 // genericMethodsMatch checks if methods match considering generic type parameters
-func (ma *methodAnalyzer) genericMethodsMatch(instMethod, genericMethod *types.Func, instType, genericType *types.Named) bool <span class="cov3" title="5">{
+func (ma *methodAnalyzer) genericMethodsMatch(instMethod, genericMethod *types.Func, instType, genericType *types.Named) bool <span class="cov2" title="5">{
         // For now, we'll use a simple heuristic:
         // If the method names match and the generic interface has the method,
         // we consider it a match. This handles most common cases.
@@ -489,17 +491,17 @@ func (ma *methodAnalyzer) genericMethodsMatch(instMethod, genericMethod *types.F
                         instMethod.Name(), genericMethod.Name(), instType, genericType)
         }</span>
 
-        <span class="cov3" title="5">return true</span> // If names match and we got here, consider it a match
+        <span class="cov2" title="5">return true</span> // If names match and we got here, consider it a match
 }
 
 // analyzeCallExpr handles function calls (specifically fmt.* functions)
-func (ma *methodAnalyzer) analyzeCallExpr(node *ast.CallExpr) <span class="cov7" title="110">{
+func (ma *methodAnalyzer) analyzeCallExpr(node *ast.CallExpr) <span class="cov5" title="110">{
         ident := ma.extractFunctionIdent(node)
-        if ident == nil </span><span class="cov3" title="4">{
+        if ident == nil </span><span class="cov2" title="4">{
                 return
         }</span>
 
-        <span class="cov7" title="106">if !ma.isFmtFunction(ident) </span><span class="cov7" title="105">{
+        <span class="cov5" title="106">if !ma.isFmtFunction(ident) </span><span class="cov5" title="105">{
                 return
         }</span>
 
@@ -507,19 +509,19 @@ func (ma *methodAnalyzer) analyzeCallExpr(node *ast.CallExpr) <span class="cov7"
 }
 
 // extractFunctionIdent extracts function identifier from call expression
-func (ma *methodAnalyzer) extractFunctionIdent(node *ast.CallExpr) *ast.Ident <span class="cov7" title="110">{
+func (ma *methodAnalyzer) extractFunctionIdent(node *ast.CallExpr) *ast.Ident <span class="cov5" title="110">{
         switch fun := node.Fun.(type) </span>{
-        case *ast.Ident:<span class="cov3" title="7">
+        case *ast.Ident:<span class="cov2" title="7">
                 return fun</span>
-        case *ast.SelectorExpr:<span class="cov7" title="99">
+        case *ast.SelectorExpr:<span class="cov5" title="99">
                 return fun.Sel</span>
-        default:<span class="cov3" title="4">
+        default:<span class="cov2" title="4">
                 return nil</span>
         }
 }
 
 // isFmtFunction checks if the function belongs to fmt package
-func (ma *methodAnalyzer) isFmtFunction(ident *ast.Ident) bool <span class="cov7" title="106">{
+func (ma *methodAnalyzer) isFmtFunction(ident *ast.Ident) bool <span class="cov5" title="106">{
         fn, ok := ma.pass.TypesInfo.Uses[ident].(*types.Func)
         return ok &amp;&amp; fn.Pkg() != nil &amp;&amp; fn.Pkg().Path() == "fmt"
 }</span>
@@ -539,17 +541,17 @@ func (ma *methodAnalyzer) analyzeFmtCall(node *ast.CallExpr) <span class="cov1" 
 // checkStringerUsage checks if argument implements Stringer interface
 func (ma *methodAnalyzer) checkStringerUsage(argType types.Type) <span class="cov1" title="1">{
         // Only check String() methods - use name index for faster lookup
-        stringMethods, hasStringMethods := ma.methodsByName["String"]
-        if !hasStringMethods </span><span class="cov0" title="0">{
+        stringMethods := ma.getMethodsByName("String")
+        if len(stringMethods) == 0 </span><span class="cov0" title="0">{
                 return
         }</span>
 
-        <span class="cov1" title="1">for _, ifaceMethod := range stringMethods </span><span class="cov2" title="2">{
+        <span class="cov1" title="1">for _, ifaceMethod := range stringMethods </span><span class="cov1" title="2">{
                 if ma.usedMethods[ifaceMethod] </span><span class="cov0" title="0">{
                         continue</span>
                 }
 
-                <span class="cov2" title="2">if !ma.isStringerMethod(ifaceMethod) </span><span class="cov1" title="1">{
+                <span class="cov1" title="2">if !ma.isStringerMethod(ifaceMethod) </span><span class="cov1" title="1">{
                         continue</span>
                 }
 
@@ -565,12 +567,12 @@ func (ma *methodAnalyzer) checkStringerUsage(argType types.Type) <span class="co
 }
 
 // isStringerMethod checks if method is String() string
-func (ma *methodAnalyzer) isStringerMethod(method *types.Func) bool <span class="cov2" title="2">{
+func (ma *methodAnalyzer) isStringerMethod(method *types.Func) bool <span class="cov1" title="2">{
         if method.Name() != "String" </span><span class="cov0" title="0">{
                 return false
         }</span>
 
-        <span class="cov2" title="2">sig, ok := method.Type().(*types.Signature)
+        <span class="cov1" title="2">sig, ok := method.Type().(*types.Signature)
         if !ok || sig.Params().Len() != 0 || sig.Results().Len() != 1 </span><span class="cov1" title="1">{
                 return false
         }</span>
@@ -582,30 +584,30 @@ func (ma *methodAnalyzer) isStringerMethod(method *types.Func) bool <span class=
 // reportUnusedMethods sorts and reports methods that were not used.
 func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]methodInfo, used map[*types.Func]bool) <span class="cov1" title="1">{
         // mark used methods
-        for m := range used </span><span class="cov7" title="62">{
-                if info, ok := ifaceMethods[m]; ok </span><span class="cov7" title="62">{
+        for m := range used </span><span class="cov5" title="62">{
+                if info, ok := ifaceMethods[m]; ok </span><span class="cov5" title="62">{
                         info.used = true
                         ifaceMethods[m] = info
                 }</span>
         }
 
         <span class="cov1" title="1">var unused []methodInfo
-        for _, info := range ifaceMethods </span><span class="cov8" title="122">{
-                if !info.used </span><span class="cov6" title="60">{
+        for _, info := range ifaceMethods </span><span class="cov5" title="122">{
+                if !info.used </span><span class="cov5" title="60">{
                         unused = append(unused, info)
                 }</span>
         }
 
-        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov9" title="331">{
+        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="339">{
                 posI := pass.Fset.Position(unused[i].method.Pos())
                 posJ := pass.Fset.Position(unused[j].method.Pos())
-                if posI.Filename != posJ.Filename </span><span class="cov7" title="93">{
+                if posI.Filename != posJ.Filename </span><span class="cov5" title="118">{
                         return posI.Filename &lt; posJ.Filename
                 }</span>
-                <span class="cov9" title="238">return posI.Line &lt; posJ.Line</span>
+                <span class="cov6" title="221">return posI.Line &lt; posJ.Line</span>
         })
 
-        <span class="cov1" title="1">for _, info := range unused </span><span class="cov6" title="60">{
+        <span class="cov1" title="1">for _, info := range unused </span><span class="cov5" title="60">{
                 pass.Reportf(info.method.Pos(), "method %q of interface %q is declared but not used", info.method.Name(), info.ifaceName)
         }</span>
 }
@@ -622,18 +624,18 @@ func Run() <span class="cov0" title="0">{
 }</span>
 
 // getTypeName extracts the name of a named type
-func getTypeName(t types.Type) string <span class="cov3" title="4">{
-        if named, ok := t.(*types.Named); ok </span><span class="cov2" title="2">{
+func getTypeName(t types.Type) string <span class="cov2" title="4">{
+        if named, ok := t.(*types.Named); ok </span><span class="cov1" title="2">{
                 return named.Obj().Name()
         }</span>
-        <span class="cov2" title="2">return ""</span>
+        <span class="cov1" title="2">return ""</span>
 }
 
 // typeCache caches type lookups to avoid repeated searches
 var typeCache = make(map[string]types.Type)
 
 // concreteTypeImplementsInterface checks if a concrete type implements an interface
-func (ma *methodAnalyzer) concreteTypeImplementsInterface(typeName string, iface *types.Interface) bool <span class="cov2" title="2">{
+func (ma *methodAnalyzer) concreteTypeImplementsInterface(typeName string, iface *types.Interface) bool <span class="cov1" title="2">{
         // Check cache first
         if cachedType, found := typeCache[typeName]; found </span><span class="cov1" title="1">{
                 if named, ok := cachedType.(*types.Named); ok </span><span class="cov1" title="1">{
@@ -643,11 +645,11 @@ func (ma *methodAnalyzer) concreteTypeImplementsInterface(typeName string, iface
         }
 
         // Find the type by name in the package
-        <span class="cov1" title="1">for _, obj := range ma.pass.TypesInfo.Defs </span><span class="cov10" title="470">{
-                if obj == nil </span><span class="cov4" title="12">{
+        <span class="cov1" title="1">for _, obj := range ma.pass.TypesInfo.Defs </span><span class="cov6" title="295">{
+                if obj == nil </span><span class="cov2" title="7">{
                         continue</span>
                 }
-                <span class="cov9" title="458">if obj.Name() == typeName </span><span class="cov1" title="1">{
+                <span class="cov6" title="288">if obj.Name() == typeName </span><span class="cov1" title="1">{
                         if named, ok := obj.Type().(*types.Named); ok </span><span class="cov1" title="1">{
                                 // Cache the type for future lookups
                                 typeCache[typeName] = named
