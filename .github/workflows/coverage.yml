@@ -2,9 +2,9 @@ name: Coverage Badge
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 permissions:
   contents: write
@@ -17,7 +17,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.2'
+          go-version: "1.24.2"
           cache: false
 
       - name: Checkout
@@ -31,6 +31,11 @@ jobs:
           git config --global user.email "action@github.com"
           git config --global user.name "GitHub Action"
           git config --global --add safe.directory $GITHUB_WORKSPACE
+
+      - name: Run linters
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.2.1
 
       - name: Run tests and generate coverage
         run: |

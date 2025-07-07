@@ -83,6 +83,8 @@ The configuration file is automatically searched in the current directory (or `.
 - ✅ **Problems panel** integration with clickable errors
 - ✅ **File explorer markers** showing files with issues
 
+🔄 **Optional**: Install the [Trigger Task on Save](https://marketplace.visualstudio.com/items?itemName=Gruntfuggly.triggertaskonsave) extension to automatically run the task silently on file save.
+
 ## 📋 Sample Output
 
 ```

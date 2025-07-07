@@ -1,8 +1,10 @@
+version: "2"
+
 linters:
   enable:
     - govet
-    - unused
-    - ineffassign
+    - errcheck
 
-run:
-  timeout: 10m
+  exclusions:
+    paths:
+      - "_test\\.go$"
