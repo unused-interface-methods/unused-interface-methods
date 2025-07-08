@@ -598,13 +598,13 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
                 }</span>
         }
 
-        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="390">{
+        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="347">{
                 posI := pass.Fset.Position(unused[i].method.Pos())
                 posJ := pass.Fset.Position(unused[j].method.Pos())
-                if posI.Filename != posJ.Filename </span><span class="cov5" title="125">{
+                if posI.Filename != posJ.Filename </span><span class="cov5" title="93">{
                         return posI.Filename &lt; posJ.Filename
                 }</span>
-                <span class="cov6" title="265">return posI.Line &lt; posJ.Line</span>
+                <span class="cov6" title="254">return posI.Line &lt; posJ.Line</span>
         })
 
         <span class="cov1" title="1">for _, info := range unused </span><span class="cov5" title="60">{
@@ -645,11 +645,11 @@ func (ma *methodAnalyzer) concreteTypeImplementsInterface(typeName string, iface
         }
 
         // Find the type by name in the package
-        <span class="cov1" title="1">for _, obj := range ma.pass.TypesInfo.Defs </span><span class="cov6" title="195">{
+        <span class="cov1" title="1">for _, obj := range ma.pass.TypesInfo.Defs </span><span class="cov6" title="180">{
                 if obj == nil </span><span class="cov2" title="5">{
                         continue</span>
                 }
-                <span class="cov6" title="190">if obj.Name() == typeName </span><span class="cov1" title="1">{
+                <span class="cov6" title="175">if obj.Name() == typeName </span><span class="cov1" title="1">{
                         if named, ok := obj.Type().(*types.Named); ok </span><span class="cov1" title="1">{
                                 // Cache the type for future lookups
                                 typeCache[typeName] = named
@@ -821,24 +821,24 @@ func LoadConfig(configPath string) (*Config, error) <span class="cov5" title="6"
 		<pre class="file" id="file3" style="display: none">package main
 
 import (
-        "flag"
         "fmt"
+        "os"
         "runtime/debug"
 
         "github.com/unused-interface-methods/unused-interface-methods/internal/analizer"
 )
 
 func main() <span class="cov0" title="0">{
-        vFlag := flag.Bool("v", false, "show version")
-        flag.Parse()
-        if *vFlag </span><span class="cov0" title="0">{
+        for _, arg := range os.Args[1:] </span><span class="cov0" title="0">{
+                if arg == "-v" || arg == "--version" </span><span class="cov0" title="0">{
                         info, ok := debug.ReadBuildInfo()
-                        if ok </span><span class="cov0" title="0">{
-                                        fmt.Println("Version:", info.Main.Version)
+                        if ok &amp;&amp; info.Main.Version != "" </span><span class="cov0" title="0">{
+                                fmt.Println("Version:", info.Main.Version)
                         }</span> else<span class="cov0" title="0"> {
-                                        fmt.Println("Version: unknown")
+                                fmt.Println("Version: unknown")
                         }</span>
                         <span class="cov0" title="0">return</span>
+                }
         }
         <span class="cov0" title="0">analizer.Run()</span>
 }

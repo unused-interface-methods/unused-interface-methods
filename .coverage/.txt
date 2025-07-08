@@ -27,4 +27,4 @@ github.com/unused-interface-methods/unused-interface-methods/internal/config/con
 github.com/unused-interface-methods/unused-interface-methods/internal/config/config.go:61:	ShouldIgnore			100.0%
 github.com/unused-interface-methods/unused-interface-methods/internal/config/config.go:75:	LoadConfig			87.5%
 github.com/unused-interface-methods/unused-interface-methods/main.go:11:			main				0.0%
-total:												(statements)			84.9%
+total:												(statements)			85.2%
