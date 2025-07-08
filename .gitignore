@@ -25,7 +25,7 @@ go.work.sum
 # .idea/
 # .vscode/
 
-# ignoring file unused-interface-methods but not directory cmd/unused-interface-methods
+# ignoring file unused-interface-methods
 /unused-interface-methods
 
 .coverage/.out
