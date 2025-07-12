@@ -28,7 +28,12 @@ go.work.sum
 # ignoring file unused-interface-methods
 /unused-interface-methods
 
+# coverage directory
 .coverage/.out
 .coverage/.tmp
 
+# vendor directory
+vendor/
+
+# macOS
 .DS_Store
