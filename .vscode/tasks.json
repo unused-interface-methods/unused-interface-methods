@@ -6,15 +6,32 @@
       "type": "shell",
       "command": "${command:go.buildTags}",
       "windows": {
+        "options": {
+          "env": {
+            "UNUSED_INTERFACE_METHODS_VERBOSE": "1",
+          }
+        },
         "command": "unused-interface-methods.exe"
       },
       "linux": {
+        "options": {
+          "env": {
+            "UNUSED_INTERFACE_METHODS_VERBOSE": "1",
+          }
+        },
         "command": "unused-interface-methods"
       },
       "osx": {
+        "options": {
+          "env": {
+            "UNUSED_INTERFACE_METHODS_VERBOSE": "1",
+          }
+        },
         "command": "unused-interface-methods"
       },
-      "args": ["./..."],
+      "args": [
+        "./..."
+      ],
       "group": {
         "kind": "build",
         "isDefault": false
