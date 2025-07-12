@@ -10,6 +10,12 @@ vars:
       fi
 
 tasks:
+  default:
+    cmds:
+      - task --list
+      - echo "task <name> --summary"
+    silent: true
+
   lint:
     desc: "run golangci-lint"
     cmds:
@@ -50,8 +56,3 @@ tasks:
         else
           ./{{.BINARY_NAME}} ./...
         fi
-
-  default:
-    desc: "show available tasks"
-    cmds:
-      - task --list
