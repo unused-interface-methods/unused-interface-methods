@@ -31,7 +31,31 @@ func TestShouldIgnore(t *testing.T) {
 	}
 }
 
-func TestLoadConfig(t *testing.T) {
+func TestLoadConfig_NotFoundInStartDir(t *testing.T) {
+	// Save and restore current directory
+	startDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(startDir)
+
+	// Check that there's no config in the start directory
+	if _, err := os.Stat(filepath.Join(startDir, ".unused-interface-methods.yml")); err == nil {
+		t.Fatal("config file exists in start dir, test cannot proceed")
+	}
+
+	// Should get default config
+	cfg, err := LoadConfig("")
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v", err)
+	}
+	want := defaultConfig()
+	if !reflect.DeepEqual(cfg, want) {
+		t.Errorf("LoadConfig() = %v, want %v", cfg, want)
+	}
+}
+
+func TestLoadConfig_FoundInTempDir(t *testing.T) {
 	// Save and restore current directory
 	startDir, err := os.Getwd()
 	if err != nil {
@@ -42,138 +66,142 @@ func TestLoadConfig(t *testing.T) {
 	// Create temporary directory for tests
 	tmpDir := t.TempDir()
 
-	t.Run("config not found in start dir", func(t *testing.T) {
-		// Check that there's no config in the start directory
-		if _, err := os.Stat(filepath.Join(startDir, ".unused-interface-methods.yml")); err == nil {
-			t.Fatal("config file exists in start dir, test cannot proceed")
-		}
+	// Change to temporary directory
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
 
-		// Should get default config
-		cfg, err := LoadConfig("")
-		if err != nil {
-			t.Fatalf("LoadConfig() error = %v", err)
-		}
-		want := defaultConfig()
-		if !reflect.DeepEqual(cfg, want) {
-			t.Errorf("LoadConfig() = %v, want %v", cfg, want)
-		}
-	})
-
-	t.Run("config found in temp dir", func(t *testing.T) {
-		// Change to temporary directory
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
-
-		// Create config in temporary directory
-		content := []byte(`ignore:
+	// Create config in temporary directory
+	content := []byte(`ignore:
   - "vendor/**"
   - "**/*.pb.go"`)
-		if err := os.WriteFile(".unused-interface-methods.yml", content, 0644); err != nil {
-			t.Fatal(err)
-		}
+	if err := os.WriteFile(".unused-interface-methods.yml", content, 0644); err != nil {
+		t.Fatal(err)
+	}
 
-		// Check that file exists
-		if _, err := os.Stat(".unused-interface-methods.yml"); err != nil {
-			t.Fatal("config file was not created")
-		}
+	// Check that file exists
+	if _, err := os.Stat(".unused-interface-methods.yml"); err != nil {
+		t.Fatal("config file was not created")
+	}
 
-		// Load config
-		cfg, err := LoadConfig("")
-		if err != nil {
-			t.Fatalf("LoadConfig() error = %v", err)
-		}
+	// Load config
+	cfg, err := LoadConfig("")
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v", err)
+	}
 
-		want := &Config{
-			Ignore: []string{
-				"vendor/**",
-				"**/*.pb.go",
-			},
-		}
-		if !reflect.DeepEqual(cfg, want) {
-			t.Errorf("LoadConfig() = %v, want %v", cfg, want)
-		}
-	})
+	want := &Config{
+		Ignore: []string{
+			"vendor/**",
+			"**/*.pb.go",
+		},
+	}
+	if !reflect.DeepEqual(cfg, want) {
+		t.Errorf("LoadConfig() = %v, want %v", cfg, want)
+	}
+}
 
-	t.Run("invalid yaml", func(t *testing.T) {
-		// Change to temporary directory
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+func TestLoadConfig_InvalidYAML(t *testing.T) {
+	// Save and restore current directory
+	startDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(startDir)
 
-		// Create invalid config
-		content := []byte(`ignore: [`)
-		if err := os.WriteFile(".unused-interface-methods.yml", content, 0644); err != nil {
-			t.Fatal(err)
-		}
+	// Create temporary directory for tests
+	tmpDir := t.TempDir()
 
-		_, err := LoadConfig("")
-		if err == nil {
-			t.Error("LoadConfig() error = nil, want error for invalid yaml")
-		}
-	})
+	// Change to temporary directory
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
 
-	t.Run("explicit config path", func(t *testing.T) {
-		// Create config in non-standard location
-		content := []byte(`ignore:
+	// Create invalid config
+	content := []byte(`ignore: [`)
+	if err := os.WriteFile(".unused-interface-methods.yml", content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = LoadConfig("")
+	if err == nil {
+		t.Error("LoadConfig() error = nil, want error for invalid yaml")
+	}
+}
+
+func TestLoadConfig_ExplicitConfigPath(t *testing.T) {
+	// Create temporary directory for tests
+	tmpDir := t.TempDir()
+
+	// Create config in non-standard location
+	content := []byte(`ignore:
   - "custom/**"`)
-		customPath := filepath.Join(tmpDir, "custom.yml")
-		if err := os.WriteFile(customPath, content, 0644); err != nil {
-			t.Fatal(err)
-		}
+	customPath := filepath.Join(tmpDir, "custom.yml")
+	if err := os.WriteFile(customPath, content, 0644); err != nil {
+		t.Fatal(err)
+	}
 
-		cfg, err := LoadConfig(customPath)
-		if err != nil {
-			t.Fatalf("LoadConfig() error = %v", err)
-		}
+	cfg, err := LoadConfig(customPath)
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v", err)
+	}
 
-		want := &Config{
-			Ignore: []string{
-				"custom/**",
-			},
-		}
-		if !reflect.DeepEqual(cfg, want) {
-			t.Errorf("LoadConfig() = %v, want %v", cfg, want)
-		}
-	})
+	want := &Config{
+		Ignore: []string{
+			"custom/**",
+		},
+	}
+	if !reflect.DeepEqual(cfg, want) {
+		t.Errorf("LoadConfig() = %v, want %v", cfg, want)
+	}
+}
 
-	t.Run("permission denied", func(t *testing.T) {
-		// Skip this test on Windows as permission handling is different
-		if runtime.GOOS == "windows" {
-			t.Skip("Skipping permission test on Windows")
-		}
+func TestLoadConfig_PermissionDenied(t *testing.T) {
+	// Skip this test on Windows as permission handling is different
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping permission test on Windows")
+	}
 
-		// Change to temporary directory
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+	// Save and restore current directory
+	startDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(startDir)
 
-		// Create subdirectory without read permissions
-		noAccessDir := filepath.Join(tmpDir, "noaccess")
-		if err := os.Mkdir(noAccessDir, 0700); err != nil {
-			t.Fatal(err)
-		}
+	// Create temporary directory for tests
+	tmpDir := t.TempDir()
 
-		// Create config
-		content := []byte(`ignore:
+	// Change to temporary directory
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create subdirectory without read permissions
+	noAccessDir := filepath.Join(tmpDir, "noaccess")
+	if err := os.Mkdir(noAccessDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create config
+	content := []byte(`ignore:
   - "vendor/**"`)
-		configPath := filepath.Join(noAccessDir, ".unused-interface-methods.yml")
-		if err := os.WriteFile(configPath, content, 0644); err != nil {
-			t.Fatal(err)
-		}
+	configPath := filepath.Join(noAccessDir, ".unused-interface-methods.yml")
+	if err := os.WriteFile(configPath, content, 0644); err != nil {
+		t.Fatal(err)
+	}
 
-		// Remove read permissions from directory
-		if err := os.Chmod(noAccessDir, 0000); err != nil {
-			t.Fatal(err)
-		}
+	// Remove read permissions from directory
+	if err := os.Chmod(noAccessDir, 0000); err != nil {
+		t.Fatal(err)
+	}
 
-		// Try to load config
-		_, err := LoadConfig(configPath)
-		if err == nil {
-			t.Error("LoadConfig() error = nil, want error for permission denied")
-		}
+	// Try to load config
+	_, err = LoadConfig(configPath)
+	if err == nil {
+		t.Error("LoadConfig() error = nil, want error for permission denied")
+	}
 
-		// Restore permissions for cleanup
-		os.Chmod(noAccessDir, 0700)
-	})
+	// Restore permissions for cleanup
+	os.Chmod(noAccessDir, 0700)
 }
