@@ -125,7 +125,6 @@ make build
 ## ⚠️ Known Limitations
 
 - 🪞 **Reflection**: Cannot track `reflect.Value.Call()` usage
-- 🤖 **Code Generation**: Dynamic/generated code is not analyzed
 - 🔌 **Plugins**: Runtime plugin loading is not tracked
 - 🧪 **Generics**: Best-effort matching; edge cases may slip through
 
