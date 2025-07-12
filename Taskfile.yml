@@ -20,21 +20,25 @@ tasks:
     desc: "run golangci-lint"
     cmds:
       - golangci-lint run .
+    silent: true
 
   build:
     desc: "build unused-interface-methods linter"
     cmds:
       - go build -o {{.BINARY_NAME}} .
+    silent: true
 
   test:
     desc: "run tests"
     cmds:
       - go test -v
+    silent: true
 
   bench:
     desc: "run benchmarks"
     cmds:
       - go test -bench=.
+    silent: true
 
   clean:
     desc: "clean build artifacts"
@@ -45,6 +49,7 @@ tasks:
         else
           rm -f {{.BINARY_NAME}}
         fi
+    silent: true
 
   try:
     desc: "run unused-interface-methods linter"
@@ -56,3 +61,4 @@ tasks:
         else
           ./{{.BINARY_NAME}} ./...
         fi
+    silent: true
