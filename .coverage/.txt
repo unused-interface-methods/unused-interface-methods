@@ -18,7 +18,7 @@ github.com/unused-interface-methods/unused-interface-methods/internal/analizer/a
 github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:529:	run				100.0%
 github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:536:	Run				0.0%
 github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:541:	getTypeName			100.0%
-github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:552:	concreteTypeImplementsInterface	84.6%
+github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go:552:	concreteTypeImplementsInterface	76.9%
 github.com/unused-interface-methods/unused-interface-methods/internal/analizer/init.go:18:	init				58.3%
 github.com/unused-interface-methods/unused-interface-methods/internal/analizer/init.go:36:	extractBasePath			100.0%
 github.com/unused-interface-methods/unused-interface-methods/internal/config/config.go:18:	defaultConfig			100.0%
@@ -26,5 +26,5 @@ github.com/unused-interface-methods/unused-interface-methods/internal/config/con
 github.com/unused-interface-methods/unused-interface-methods/internal/config/config.go:51:	matchPattern			100.0%
 github.com/unused-interface-methods/unused-interface-methods/internal/config/config.go:61:	ShouldIgnore			100.0%
 github.com/unused-interface-methods/unused-interface-methods/internal/config/config.go:75:	LoadConfig			87.5%
-github.com/unused-interface-methods/unused-interface-methods/main.go:11:			main				0.0%
-total:												(statements)			85.2%
+github.com/unused-interface-methods/unused-interface-methods/main.go:13:			main				0.0%
+total:												(statements)			84.9%

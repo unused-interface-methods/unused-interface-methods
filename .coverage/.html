@@ -55,7 +55,7 @@
 			<div id="nav">
 				<select id="files">
 				
-				<option value="file0">github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go (88.1%)</option>
+				<option value="file0">github.com/unused-interface-methods/unused-interface-methods/internal/analizer/analizer.go (87.7%)</option>
 				
 				<option value="file1">github.com/unused-interface-methods/unused-interface-methods/internal/analizer/init.go (72.2%)</option>
 				
@@ -598,13 +598,13 @@ func reportUnusedMethods(pass *analysis.Pass, ifaceMethods map[*types.Func]metho
                 }</span>
         }
 
-        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="347">{
+        <span class="cov1" title="1">sort.Slice(unused, func(i, j int) bool </span><span class="cov6" title="317">{
                 posI := pass.Fset.Position(unused[i].method.Pos())
                 posJ := pass.Fset.Position(unused[j].method.Pos())
-                if posI.Filename != posJ.Filename </span><span class="cov5" title="93">{
+                if posI.Filename != posJ.Filename </span><span class="cov5" title="107">{
                         return posI.Filename &lt; posJ.Filename
                 }</span>
-                <span class="cov6" title="254">return posI.Line &lt; posJ.Line</span>
+                <span class="cov6" title="210">return posI.Line &lt; posJ.Line</span>
         })
 
         <span class="cov1" title="1">for _, info := range unused </span><span class="cov5" title="60">{
@@ -645,11 +645,11 @@ func (ma *methodAnalyzer) concreteTypeImplementsInterface(typeName string, iface
         }
 
         // Find the type by name in the package
-        <span class="cov1" title="1">for _, obj := range ma.pass.TypesInfo.Defs </span><span class="cov6" title="180">{
-                if obj == nil </span><span class="cov2" title="5">{
+        <span class="cov1" title="1">for _, obj := range ma.pass.TypesInfo.Defs </span><span class="cov3" title="16">{
+                if obj == nil </span><span class="cov0" title="0">{
                         continue</span>
                 }
-                <span class="cov6" title="175">if obj.Name() == typeName </span><span class="cov1" title="1">{
+                <span class="cov3" title="16">if obj.Name() == typeName </span><span class="cov1" title="1">{
                         if named, ok := obj.Type().(*types.Named); ok </span><span class="cov1" title="1">{
                                 // Cache the type for future lookups
                                 typeCache[typeName] = named
@@ -827,6 +827,8 @@ import (
 
         "github.com/unused-interface-methods/unused-interface-methods/internal/analizer"
 )
+
+// TODO: linter: The Idiom of Passing Interfaces and Returning Structures
 
 func main() <span class="cov0" title="0">{
         for _, arg := range os.Args[1:] </span><span class="cov0" title="0">{
